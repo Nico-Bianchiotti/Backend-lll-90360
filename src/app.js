@@ -6,8 +6,6 @@ import AppError from './utils/errors.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { HTTP_STATUS } from './constants/index.js';
 
-// Arma la app de Express (sin conectarse a la base ni escuchar un puerto),
-// así más adelante se puede usar en los tests.
 const app = express();
 
 app.use(cors());

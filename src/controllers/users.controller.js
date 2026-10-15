@@ -1,8 +1,6 @@
 import usersService from '../services/users.service.js';
 import { HTTP_STATUS } from '../constants/index.js';
 
-// Única puerta de entrada HTTP para usuarios.
-
 class UsersController {
   async getAll(req, res, next) {
     try {

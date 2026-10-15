@@ -4,9 +4,6 @@ import { config } from '../config/env.config.js';
 import AppError from '../utils/errors.js';
 import { PRODUCT_STATUS, SHIPPING_RATES, HTTP_STATUS } from '../constants/index.js';
 
-// Reglas de negocio de los productos. No conoce Express (req/res)
-// ni Mongoose: recibe sus dependencias por el constructor.
-
 export class ProductsService {
   constructor(repository, notifier, appConfig) {
     this.repository = repository;
@@ -14,7 +11,6 @@ export class ProductsService {
     this.config = appConfig;
   }
 
-  // Regla: el estado depende del stock.
   resolveStatus(stock) {
     return stock > 0 ? PRODUCT_STATUS.AVAILABLE : PRODUCT_STATUS.OUT_OF_STOCK;
   }
@@ -30,8 +26,6 @@ export class ProductsService {
     return normalized;
   }
 
-  // Regla: el catálogo público muestra solo productos con stock,
-  // salvo que se pidan todos explícitamente.
   async getAll({ includeOutOfStock = false } = {}) {
     return includeOutOfStock
       ? this.repository.findAll()
@@ -100,7 +94,6 @@ export class ProductsService {
     return product;
   }
 
-  // Regla: en desarrollo la tarifa es plana; en producción, base + 1% de seguro.
   calculateShippingCost(declaredValue) {
     if (!this.config.shippingApiKey) {
       throw new AppError('Configuración inválida: falta la API key de envíos', HTTP_STATUS.INTERNAL_SERVER_ERROR);

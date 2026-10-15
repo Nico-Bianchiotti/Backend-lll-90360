@@ -1,6 +1,3 @@
-// Valores inmutables del dominio de ShipNow.
-// Se usan en lugar de strings sueltos ("admin", "available", etc.).
-
 export const USER_ROLES = Object.freeze({
   ADMIN: 'admin',
   USER: 'user'

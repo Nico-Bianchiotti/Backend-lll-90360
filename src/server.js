@@ -1,5 +1,3 @@
-// La configuración se importa primero: si falta una variable crítica,
-// la app se detiene acá con un error descriptivo.
 import { config } from './config/env.config.js';
 import { connectDB } from './config/db.js';
 import app from './app.js';

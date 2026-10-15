@@ -1,9 +1,6 @@
 import mongoose from 'mongoose';
 import User from '../models/user.model.js';
 
-// Único lugar que conoce el modelo User.
-// La contraseña nunca sale de esta capa: la proyección la excluye siempre.
-
 const PUBLIC_FIELDS = '-password -__v';
 
 const toPublicUser = (userDocument) => {

@@ -2,10 +2,6 @@ import mongoose from 'mongoose';
 import Product from '../models/product.model.js';
 import { PRODUCT_STATUS } from '../constants/index.js';
 
-// Único lugar (junto con users.repository) que conoce Mongoose.
-// Encapsula: filtros por defecto, proyección de campos, validación de IDs
-// y devuelve objetos planos (lean) en lugar de documentos de Mongoose.
-
 const PUBLIC_FIELDS = '-__v';
 
 class ProductsRepository {
@@ -16,8 +12,6 @@ class ProductsRepository {
       .lean();
   }
 
-  // Filtro por defecto del catálogo: solo productos que se pueden vender.
-  // La consulta filtra en la base, en vez de traer todo y filtrar en memoria.
   async findAvailable() {
     return Product.find({ stock: { $gt: 0 }, status: PRODUCT_STATUS.AVAILABLE })
       .select(PUBLIC_FIELDS)
@@ -30,7 +24,6 @@ class ProductsRepository {
     return Product.findById(id).select(PUBLIC_FIELDS).lean();
   }
 
-  // excludeId permite ignorar el propio producto al editarlo
   async existsByCode(code, excludeId = null) {
     const filter = { code: String(code).trim() };
     if (excludeId && mongoose.isValidObjectId(excludeId)) filter._id = { $ne: excludeId };

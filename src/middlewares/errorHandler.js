@@ -1,7 +1,5 @@
 import { HTTP_STATUS } from '../constants/index.js';
 
-// Único lugar que arma las respuestas de error.
-// eslint-disable-next-line no-unused-vars
 export const errorHandler = (err, req, res, next) => {
   let statusCode = err.statusCode || HTTP_STATUS.INTERNAL_SERVER_ERROR;
   let message = err.message;
@@ -21,8 +19,7 @@ export const errorHandler = (err, req, res, next) => {
   }
 
   if (statusCode >= HTTP_STATUS.INTERNAL_SERVER_ERROR) {
-    // Error inesperado: detalle completo en el log, mensaje genérico al cliente
-    console.error(err);
+    console.error(err); 
     message = 'Error interno del servidor';
   }
 

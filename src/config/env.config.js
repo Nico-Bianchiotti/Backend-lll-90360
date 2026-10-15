@@ -2,8 +2,6 @@ import dotenv from 'dotenv';
 
 dotenv.config({ quiet: true });
 
-// Único archivo del proyecto que lee process.env.
-// Si falta algo crítico, la app no arranca y avisa qué falta.
 
 const REQUIRED_VARS = ['PORT', 'MONGODB_URI', 'NODE_ENV', 'SHIPPING_API_KEY'];
 const VALID_ENVIRONMENTS = ['development', 'production', 'test'];

@@ -1,9 +1,6 @@
 import productsService from '../services/products.service.js';
 import { HTTP_STATUS } from '../constants/index.js';
 
-// Única puerta de entrada HTTP para productos: lee req, llama al Service
-// y arma la respuesta. Los errores se derivan al middleware con next().
-
 class ProductsController {
   async getAll(req, res, next) {
     try {
