@@ -46,6 +46,27 @@ class UsersRepository {
     if (!mongoose.isValidObjectId(id)) return null;
     return User.findByIdAndDelete(id).select(PUBLIC_FIELDS).lean();
   }
+
+  get collectionName() {
+    return User.collection.collectionName;
+  }
+
+  // Carga masiva (usada por la carga de datos de prueba)
+  async insertMany(users) {
+    const created = await User.insertMany(users);
+    return created.map(toPublicUser);
+  }
+
+  async findIdsByEmailDomain(domain) {
+    const escaped = domain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const users = await User.find({ email: { $regex: `@${escaped}$` } }).select('_id').lean();
+    return users.map((user) => user._id);
+  }
+
+  async deleteByIds(ids) {
+    const result = await User.deleteMany({ _id: { $in: ids } });
+    return result.deletedCount;
+  }
 }
 
 export default new UsersRepository();
