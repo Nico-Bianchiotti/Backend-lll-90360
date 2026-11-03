@@ -47,6 +47,11 @@ class UsersRepository {
     return User.findByIdAndDelete(id).select(PUBLIC_FIELDS).lean();
   }
 
+  // Indica si hay conexión activa con la base (1 = conectado)
+  isAvailable() {
+    return mongoose.connection.readyState === 1;
+  }
+
   get collectionName() {
     return User.collection.collectionName;
   }

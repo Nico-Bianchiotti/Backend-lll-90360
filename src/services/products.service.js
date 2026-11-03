@@ -1,8 +1,15 @@
 import productsRepository from '../repositories/products.repository.js';
 import emailProvider from '../utils/emailProvider.js';
 import { config } from '../config/env.config.js';
-import AppError from '../utils/errors.js';
-import { PRODUCT_STATUS, SHIPPING_RATES, HTTP_STATUS } from '../constants/index.js';
+import {
+  ProductNotFoundError,
+  ProductCodeAlreadyExistsError,
+  InvalidProductStatusError,
+  InvalidPriceError,
+  RequestValidationError,
+  ShippingConfigError
+} from '../errors/customErrors.js';
+import { PRODUCT_STATUS, SHIPPING_RATES } from '../constants/index.js';
 
 export class ProductsService {
   constructor(repository, notifier, appConfig) {
@@ -18,10 +25,7 @@ export class ProductsService {
   normalizeStatus(status) {
     const normalized = String(status).trim().toLowerCase();
     if (!Object.values(PRODUCT_STATUS).includes(normalized)) {
-      throw new AppError(
-        `Estado inválido. Valores permitidos: ${Object.values(PRODUCT_STATUS).join(', ')}`,
-        HTTP_STATUS.BAD_REQUEST
-      );
+      throw new InvalidProductStatusError(status);
     }
     return normalized;
   }
@@ -35,7 +39,7 @@ export class ProductsService {
   async getById(id) {
     const product = await this.repository.findById(id);
     if (!product) {
-      throw new AppError('Producto no encontrado', HTTP_STATUS.NOT_FOUND);
+      throw new ProductNotFoundError();
     }
     return product;
   }
@@ -44,13 +48,13 @@ export class ProductsService {
     const { title, code, price } = data;
 
     if (!title || !code || price === undefined) {
-      throw new AppError('Faltan campos obligatorios: title, code y price', HTTP_STATUS.BAD_REQUEST);
+      throw new RequestValidationError('Faltan campos obligatorios: title, code y price');
     }
     if (typeof price !== 'number' || price < 0) {
-      throw new AppError('El precio debe ser un número mayor o igual a 0', HTTP_STATUS.BAD_REQUEST);
+      throw new InvalidPriceError();
     }
     if (await this.repository.existsByCode(code)) {
-      throw new AppError(`Ya existe un producto con el código ${code}`, HTTP_STATUS.CONFLICT);
+      throw new ProductCodeAlreadyExistsError(code);
     }
 
     const stock = data.stock ?? 0;
@@ -68,7 +72,7 @@ export class ProductsService {
     const changes = { ...data };
 
     if (changes.code !== undefined && await this.repository.existsByCode(changes.code, id)) {
-      throw new AppError(`Ya existe un producto con el código ${changes.code}`, HTTP_STATUS.CONFLICT);
+      throw new ProductCodeAlreadyExistsError(changes.code);
     }
 
     if (changes.status !== undefined) {
@@ -81,7 +85,7 @@ export class ProductsService {
 
     const product = await this.repository.update(id, changes);
     if (!product) {
-      throw new AppError('Producto no encontrado', HTTP_STATUS.NOT_FOUND);
+      throw new ProductNotFoundError();
     }
     return product;
   }
@@ -89,14 +93,14 @@ export class ProductsService {
   async delete(id) {
     const product = await this.repository.delete(id);
     if (!product) {
-      throw new AppError('Producto no encontrado', HTTP_STATUS.NOT_FOUND);
+      throw new ProductNotFoundError();
     }
     return product;
   }
 
   calculateShippingCost(declaredValue) {
     if (!this.config.shippingApiKey) {
-      throw new AppError('Configuración inválida: falta la API key de envíos', HTTP_STATUS.INTERNAL_SERVER_ERROR);
+      throw new ShippingConfigError();
     }
     if (!this.config.isProduction) {
       return SHIPPING_RATES.DEVELOPMENT_FLAT_RATE;

@@ -5,13 +5,20 @@ import { generateUser } from '../mocks/users.mock.js';
 import { generateOrder } from '../mocks/orders.mock.js';
 import { generateDelivery } from '../mocks/deliveries.mock.js';
 import { faker } from '../mocks/faker.js';
-import AppError from '../utils/errors.js';
+import { calculateOrderTotal } from './orders.service.js';
+import {
+  InvalidMockQuantityError,
+  NegativeMockQuantityError,
+  MockQuantityOutOfRangeError,
+  InvalidRoleError,
+  MockSeedFailedError,
+  DatabaseUnavailableError
+} from '../errors/customErrors.js';
 import {
   USER_ROLES,
   ORDER_STATUS,
   DELIVERY_STATUS,
-  MOCKS,
-  HTTP_STATUS
+  MOCKS
 } from '../constants/index.js';
 
 // Qué estado tiene la entrega según el estado del pedido,
@@ -42,11 +49,14 @@ export class MocksService {
     if (value === undefined || value === '') return defaultValue;
 
     const qty = Number(value);
-    if (!Number.isInteger(qty) || qty < min || qty > MOCKS.MAX_QTY) {
-      throw new AppError(
-        `El parámetro "${name}" debe ser un número entero entre ${min} y ${MOCKS.MAX_QTY}`,
-        HTTP_STATUS.BAD_REQUEST
-      );
+    if (Number.isFinite(qty) && qty < 0) {
+      throw new NegativeMockQuantityError(name, value);
+    }
+    if (!Number.isInteger(qty)) {
+      throw new InvalidMockQuantityError(name, value);
+    }
+    if (qty < min || qty > MOCKS.MAX_QTY) {
+      throw new MockQuantityOutOfRangeError(name, min, qty);
     }
     return qty;
   }
@@ -56,10 +66,7 @@ export class MocksService {
 
     const normalized = String(role).trim().toLowerCase();
     if (!Object.values(USER_ROLES).includes(normalized)) {
-      throw new AppError(
-        `Rol inválido. Valores permitidos: ${Object.values(USER_ROLES).join(', ')}`,
-        HTTP_STATUS.BAD_REQUEST
-      );
+      throw new InvalidRoleError(role);
     }
     return normalized;
   }
@@ -75,11 +82,6 @@ export class MocksService {
   }
 
   // ---------- Reglas de negocio ----------
-
-  calculateOrderTotal(items) {
-    const total = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
-    return Math.round(total * 100) / 100;
-  }
 
   // Sin repartidores disponibles, un pedido solo puede estar creado o cancelado.
   pickOrderStatus(hasCouriers) {
@@ -114,7 +116,7 @@ export class MocksService {
     for (let i = 0; i < orders; i++) {
       const client = faker.helpers.arrayElement(clients);
       const order = generateOrder({ userId: client._id, status: this.pickOrderStatus(hasCouriers) });
-      order.total = this.calculateOrderTotal(order.items);
+      order.total = calculateOrderTotal(order.items);
 
       const rule = DELIVERY_RULES[order.status];
       const courier = rule.needsCourier ? faker.helpers.arrayElement(courierUsers) : null;
@@ -176,20 +178,62 @@ export class MocksService {
 
   // ---------- Carga de datos de prueba (se guardan en MongoDB) ----------
 
+  // Si la carga falla a mitad de camino, borra lo que se haya llegado a guardar.
+  // Como los IDs se generan antes de insertar, se sabe exactamente qué borrar.
+  async rollback({ userIds = [], orderIds = [] }) {
+    if (!this.usersRepository.isAvailable()) return false;
+    try {
+      await this.deliveriesRepository.deleteByOrders(orderIds);
+      await this.ordersRepository.deleteByIds(orderIds);
+      await this.usersRepository.deleteByIds(userIds);
+      return true;
+    } catch (error) {
+      console.error('[MOCKS] No se pudo deshacer la carga parcial:', error.message);
+      return false;
+    }
+  }
+
+  // Antes de cargar, se verifica que la base esté conectada para fallar rápido
+  assertDatabaseAvailable() {
+    if (!this.usersRepository.isAvailable()) {
+      throw new DatabaseUnavailableError();
+    }
+  }
+
   async seedUsers(query) {
     const qty = this.parseQty(query.qty);
     const role = this.parseRole(query.role);
+    this.assertDatabaseAvailable();
+    const users = this.buildUsers(qty, role);
 
-    const inserted = await this.usersRepository.insertMany(this.buildUsers(qty, role));
-    return { inserted: inserted.length, collection: this.usersRepository.collectionName };
+    try {
+      const inserted = await this.usersRepository.insertMany(users);
+      return { inserted: inserted.length, collection: this.usersRepository.collectionName };
+    } catch (cause) {
+      const rolledBack = await this.rollback({ userIds: users.map((user) => user._id) });
+      throw new MockSeedFailedError({ rolledBack, cause });
+    }
   }
 
   async seedScenario(query) {
     const scenario = this.buildScenario(this.parseScenario(query));
+    this.assertDatabaseAvailable();
+    const allUsers = [...scenario.clients, ...scenario.couriers];
 
-    const users = await this.usersRepository.insertMany([...scenario.clients, ...scenario.couriers]);
-    const orders = await this.ordersRepository.insertMany(scenario.orders);
-    const deliveries = await this.deliveriesRepository.insertMany(scenario.deliveries);
+    let users;
+    let orders;
+    let deliveries;
+    try {
+      users = await this.usersRepository.insertMany(allUsers);
+      orders = await this.ordersRepository.insertMany(scenario.orders);
+      deliveries = await this.deliveriesRepository.insertMany(scenario.deliveries);
+    } catch (cause) {
+      const rolledBack = await this.rollback({
+        userIds: allUsers.map((user) => user._id),
+        orderIds: scenario.orders.map((order) => order._id)
+      });
+      throw new MockSeedFailedError({ rolledBack, cause });
+    }
 
     return {
       inserted: {

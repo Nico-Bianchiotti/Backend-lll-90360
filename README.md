@@ -1,6 +1,6 @@
 # ShipNow API
 
-API de ShipNow con Node.js, Express y MongoDB, organizada en una arquitectura por capas (Controller → Service → Repository), con un módulo de mocking para generar y cargar datos de prueba.
+API de ShipNow con Node.js, Express y MongoDB, organizada en una arquitectura por capas (Controller → Service → Repository), con un módulo de mocking para generar y cargar datos de prueba y un manejo de errores centralizado.
 
 ## Requisitos
 
@@ -56,10 +56,12 @@ src/
 ├── services/              # Reglas de negocio
 ├── controllers/           # Entrada HTTP: lee req, llama al service, arma res
 ├── routes/                # Conectan cada path con su método del controller
+├── errors/
+│   ├── errorDictionary.js # Diccionario: código → status HTTP y mensaje
+│   └── customErrors.js    # AppError y los errores del dominio (UserNotFoundError, etc.)
 ├── middlewares/
-│   └── errorHandler.js    # Respuesta de error unificada
+│   └── errorHandler.js    # Middleware global: única salida de las respuestas de error
 ├── utils/
-│   ├── errors.js          # AppError (error con statusCode)
 │   └── emailProvider.js   # Proveedor de email simulado
 ├── app.js                 # Arma la app de Express
 └── server.js              # Valida la config, conecta la base y levanta el servidor
@@ -77,9 +79,13 @@ src/
 | POST | `/api/products` | Crear producto |
 | GET / PUT / DELETE | `/api/products/:id` | Obtener / actualizar / eliminar producto |
 | GET | `/api/products/:id/shipping-cost` | Cotizar el envío de un producto |
+| GET | `/api/orders` | Listar pedidos (con los datos públicos del usuario) |
+| POST | `/api/orders` | Crear pedido (`user`, `items`, `deliveryAddress`, `priority` opcional) |
+| GET | `/api/orders/:id` | Obtener un pedido |
+| PATCH | `/api/orders/:id/status` | Cambiar el estado de un pedido (`{ "status": "assigned" }`) |
 | — | `/api/mocks/...` | Datos simulados y carga de datos de prueba (ver abajo) |
 
-Las respuestas exitosas tienen la forma `{ "status": "success", "payload": ... }` y las de error, `{ "status": "error", "statusCode": 404, "message": "..." }`.
+Las respuestas exitosas tienen la forma `{ "status": "success", "payload": ... }`. Las de error se explican en [Manejo de errores](#manejo-de-errores).
 
 ## Por qué separé la lógica entre Service y Repository
 
@@ -134,7 +140,7 @@ Genera usuarios, repartidores, pedidos y entregas de prueba con [Faker](https://
 - `qty`: entero entre 1 y 100 (por defecto 5).
 - `role`: `admin`, `user` o `courier`.
 - `scenario`: por defecto `users=5`, `couriers=2`, `orders=10`. `couriers` y `orders` pueden ser 0.
-- Un valor fuera de rango o un rol inexistente responde `400` con el formato de error estándar.
+- Un valor inválido, negativo o fuera de rango, o un rol inexistente, responde `400` con el formato de error estándar (ver [Manejo de errores](#manejo-de-errores)).
 
 ### Ejemplos
 
@@ -224,3 +230,139 @@ Genera usuarios, repartidores, pedidos y entregas de prueba con [Faker](https://
 - `controllers/mocks.controller.js` y `routes/mocks.router.js`: solo HTTP; la ruta conecta el path con el método del controller.
 
 Los datos de prueba se identifican por el dominio de email `shipnow-mock.test` (un dominio reservado que no existe). Así `DELETE /api/mocks/seed` borra únicamente lo que generaron los mocks, sin tocar los datos cargados a mano.
+
+## Manejo de errores
+
+Todos los errores de la API salen de un único lugar, el middleware global `src/middlewares/errorHandler.js`, y siempre con la misma estructura.
+
+### Estructura de la respuesta de error
+
+```json
+{
+  "status": "error",
+  "statusCode": 404,
+  "error": "USER_NOT_FOUND",
+  "message": "El usuario solicitado no existe"
+}
+```
+
+| Campo | Qué es |
+| --- | --- |
+| `status` | Siempre `"error"` |
+| `statusCode` | El mismo código HTTP de la respuesta |
+| `error` | Código fijo del diccionario, pensado para que lo lea el frontend (`if (data.error === "USER_NOT_FOUND")`) |
+| `message` | Explicación para personas. Puede incluir el detalle del caso (qué parámetro falló, qué valores se permiten) |
+
+### Cómo está organizado
+
+1. **Diccionario (`src/errors/errorDictionary.js`):** cada error conocido tiene un código, un status HTTP y un mensaje por defecto. Es la única fuente de esos valores.
+2. **Errores personalizados (`src/errors/customErrors.js`):** `AppError` extiende `Error` y toma status y mensaje del diccionario. Cada caso del dominio tiene su clase: `UserNotFoundError`, `OrderNotFoundError`, `InvalidOrderStatusError`, `NegativeMockQuantityError`, `MockSeedFailedError`, etc.
+3. **Detección en los services:** los services detectan el problema y **lanzan** el error (`throw new OrderNotFoundError()`). No conocen Express ni arman respuestas.
+4. **Controllers:** no responden errores; solo los derivan con `next(error)`.
+5. **Middleware global:** convierte cualquier error en la respuesta uniforme. Además traduce errores que no son nuestros:
+
+| Origen | Código |
+| --- | --- |
+| Body con JSON mal formado | `INVALID_JSON` (400) |
+| Validación del schema de Mongoose | `VALIDATION_ERROR` (400) |
+| Clave duplicada en MongoDB | `DUPLICATE_KEY` (409) |
+| Sin conexión con MongoDB | `DATABASE_UNAVAILABLE` (503) |
+| Ruta inexistente | `ROUTE_NOT_FOUND` (404) |
+| Cualquier error no previsto (un bug) | `INTERNAL_ERROR` (500), con mensaje genérico |
+
+En los errores 500 el detalle técnico (stack, mensaje original) va **solo al log del servidor**; al cliente nunca le llegan rutas internas ni datos de conexión. Los errores 4xx se registran en el log como advertencia (`[WARN]`).
+
+### Diccionario de errores
+
+| Código | Status | Cuándo ocurre |
+| --- | --- | --- |
+| `VALIDATION_ERROR` | 400 | Faltan datos obligatorios o tienen formato incorrecto |
+| `INVALID_JSON` | 400 | El body no es un JSON válido |
+| `INVALID_ID` | 400 | Un ID con formato inválido en un campo de referencia |
+| `ROUTE_NOT_FOUND` | 404 | La ruta no existe |
+| `DUPLICATE_KEY` | 409 | Un campo único ya existe en la base |
+| `DATABASE_UNAVAILABLE` | 503 | La base de datos no responde |
+| `INTERNAL_ERROR` | 500 | Error inesperado |
+| `USER_NOT_FOUND` | 404 | El usuario no existe (también al crear un pedido para un usuario inexistente) |
+| `EMAIL_ALREADY_REGISTERED` | 409 | El email ya está registrado |
+| `INVALID_ROLE` | 400 | Rol inexistente |
+| `ADMIN_ROLE_NOT_ALLOWED` | 403 | Intento de crear o ascender un administrador |
+| `PRODUCT_NOT_FOUND` | 404 | El producto no existe |
+| `PRODUCT_CODE_ALREADY_EXISTS` | 409 | Ya hay un producto con ese código |
+| `INVALID_PRODUCT_STATUS` | 400 | Estado de producto inexistente |
+| `INVALID_PRICE` | 400 | Precio negativo o no numérico |
+| `SHIPPING_CONFIG_INVALID` | 500 | Falta la configuración del servicio de envíos |
+| `ORDER_NOT_FOUND` | 404 | El pedido no existe |
+| `INVALID_ORDER_STATUS` | 400 | Estado de pedido inexistente (por ejemplo `on_the_way`) |
+| `INVALID_ORDER_PRIORITY` | 400 | Prioridad inexistente |
+| `ORDER_OWNER_NOT_CLIENT` | 400 | Se intenta crear un pedido para un repartidor o un admin |
+| `ORDER_STATUS_LOCKED` | 409 | Se intenta cambiar el estado de un pedido entregado o cancelado |
+| `INVALID_MOCK_QUANTITY` | 400 | La cantidad de mocks no es un número entero (`abc`, `2.5`) |
+| `NEGATIVE_MOCK_QUANTITY` | 400 | La cantidad de mocks es negativa |
+| `MOCK_QUANTITY_OUT_OF_RANGE` | 400 | La cantidad de mocks está fuera del rango (1 a 100; 0 a 100 para `couriers` y `orders` del escenario) |
+| `MOCK_SEED_FAILED` | 500 | Falló la carga de datos de prueba en MongoDB |
+
+### Fallas durante la carga de mocks en MongoDB
+
+- **Antes de cargar**, el seed verifica que haya conexión con la base. Si no la hay, responde enseguida `503 DATABASE_UNAVAILABLE`, sin intentar guardar nada.
+- **Si la carga falla a mitad de camino** (por ejemplo, se guardaron los usuarios pero fallan los pedidos), el service borra lo que se llegó a guardar y responde `500 MOCK_SEED_FAILED` con el mensaje *"No se guardó ningún registro"*. Esto es posible porque los IDs se generan antes de insertar, así que se sabe exactamente qué borrar.
+- Si además la base se cayó y no se pudo deshacer, el mensaje lo avisa y sugiere limpiar con `DELETE /api/mocks/seed`.
+
+### Cómo probar los casos inválidos
+
+Con el servidor levantado (`npm run dev`), desde Postman:
+
+**Módulo de mocks**
+
+| Petición | Respuesta esperada |
+| --- | --- |
+| `GET /api/mocks/users?qty=-5` | 400 `NEGATIVE_MOCK_QUANTITY` |
+| `GET /api/mocks/users?qty=abc` | 400 `INVALID_MOCK_QUANTITY` |
+| `GET /api/mocks/users?qty=2.5` | 400 `INVALID_MOCK_QUANTITY` |
+| `GET /api/mocks/users?qty=0` | 400 `MOCK_QUANTITY_OUT_OF_RANGE` |
+| `GET /api/mocks/users?qty=500` | 400 `MOCK_QUANTITY_OUT_OF_RANGE` |
+| `GET /api/mocks/users?role=jefe` | 400 `INVALID_ROLE` |
+| `GET /api/mocks/scenario?couriers=-1` | 400 `NEGATIVE_MOCK_QUANTITY` |
+| `POST /api/mocks/seed?qty=-3` | 400 `NEGATIVE_MOCK_QUANTITY` |
+| `POST /api/mocks/seed` con la base caída | 503 `DATABASE_UNAVAILABLE` |
+
+Para probar la falla de base: con el servidor corriendo, pausá el cluster en Atlas (o cortá internet) y esperá unos segundos a que se pierda la conexión antes de llamar al seed.
+
+**Usuarios y productos**
+
+| Petición | Respuesta esperada |
+| --- | --- |
+| `GET /api/users/652f1c2b9b1e8a0012345678` | 404 `USER_NOT_FOUND` |
+| `POST /api/users` con un email ya registrado | 409 `EMAIL_ALREADY_REGISTERED` |
+| `POST /api/users` con `"role": "admin"` | 403 `ADMIN_ROLE_NOT_ALLOWED` |
+| `POST /api/users` con `"role": "jefe"` | 400 `INVALID_ROLE` |
+| `POST /api/users` con `{ "firstName": "Ana" }` | 400 `VALIDATION_ERROR` |
+| `POST /api/users` con un body mal formado (`{mal json`) | 400 `INVALID_JSON` |
+| `GET /api/products/123` | 404 `PRODUCT_NOT_FOUND` |
+| `POST /api/products` con `"price": -1` | 400 `INVALID_PRICE` |
+| `POST /api/products` con un `code` repetido | 409 `PRODUCT_CODE_ALREADY_EXISTS` |
+
+**Pedidos** (los tres casos del material del módulo)
+
+| Petición | Respuesta esperada |
+| --- | --- |
+| `POST /api/orders` con un `user` que no existe | 404 `USER_NOT_FOUND` |
+| `POST /api/orders` sin `items` o sin dirección | 400 `VALIDATION_ERROR` |
+| `PATCH /api/orders/:id/status` con `{ "status": "on_the_way" }` | 400 `INVALID_ORDER_STATUS` |
+| `GET /api/orders/652f1c2b9b1e8a0012345678` | 404 `ORDER_NOT_FOUND` |
+| `POST /api/orders` con el ID de un repartidor como `user` | 400 `ORDER_OWNER_NOT_CLIENT` |
+| `PATCH /api/orders/:id/status` sobre un pedido `delivered` | 409 `ORDER_STATUS_LOCKED` |
+| `GET /api/nada` | 404 `ROUTE_NOT_FOUND` |
+
+Body de ejemplo para crear un pedido válido (reemplazá `user` por el `_id` de un usuario con rol `user`):
+
+```json
+{
+  "user": "ID_DE_UN_USUARIO",
+  "items": [{ "description": "Caja mediana", "quantity": 2, "unitPrice": 1500 }],
+  "deliveryAddress": { "street": "Belgrano 120", "city": "Córdoba", "province": "Córdoba", "zipCode": "5000" },
+  "priority": "high"
+}
+```
+
+El pedido se crea siempre en estado `created` y con el `total` calculado por el service, aunque el body traiga otro `status` o `total`.

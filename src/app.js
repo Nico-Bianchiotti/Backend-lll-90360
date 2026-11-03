@@ -2,9 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import usersRouter from './routes/users.router.js';
 import productsRouter from './routes/products.router.js';
+import ordersRouter from './routes/orders.router.js';
 import mocksRouter from './routes/mocks.router.js';
 import { config } from './config/env.config.js';
-import AppError from './utils/errors.js';
+import { RouteNotFoundError } from './errors/customErrors.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { HTTP_STATUS } from './constants/index.js';
 
@@ -20,6 +21,7 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/users', usersRouter);
 app.use('/api/products', productsRouter);
+app.use('/api/orders', ordersRouter);
 
 // Los mocks son una herramienta de desarrollo: no existen en producción
 if (!config.isProduction) {
@@ -27,7 +29,7 @@ if (!config.isProduction) {
 }
 
 app.use((req, res, next) => {
-  next(new AppError(`Ruta no encontrada: ${req.method} ${req.originalUrl}`, HTTP_STATUS.NOT_FOUND));
+  next(new RouteNotFoundError(req.method, req.originalUrl));
 });
 
 app.use(errorHandler);

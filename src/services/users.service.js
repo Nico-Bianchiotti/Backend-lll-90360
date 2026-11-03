@@ -1,6 +1,11 @@
 import usersRepository from '../repositories/users.repository.js';
-import AppError from '../utils/errors.js';
-import { USER_ROLES, HTTP_STATUS } from '../constants/index.js';
+import {
+  UserNotFoundError,
+  EmailAlreadyRegisteredError,
+  InvalidRoleError,
+  AdminRoleNotAllowedError
+} from '../errors/customErrors.js';
+import { USER_ROLES } from '../constants/index.js';
 
 // Reglas de negocio de los usuarios. Recibe el repositorio por constructor.
 
@@ -9,10 +14,15 @@ export class UsersService {
     this.repository = repository;
   }
 
-  // Regla: desde la API pública no se pueden crear ni ascender administradores.
-  assertNotAdmin(role) {
+  // Regla: el rol tiene que existir, y desde la API pública
+  // no se pueden crear ni ascender administradores.
+  assertValidRole(role) {
+    if (role === undefined) return;
+    if (!Object.values(USER_ROLES).includes(role)) {
+      throw new InvalidRoleError(role);
+    }
     if (role === USER_ROLES.ADMIN) {
-      throw new AppError('No es posible asignar el rol de administrador desde este endpoint', HTTP_STATUS.BAD_REQUEST);
+      throw new AdminRoleNotAllowedError();
     }
   }
 
@@ -23,31 +33,31 @@ export class UsersService {
   async getById(id) {
     const user = await this.repository.findById(id);
     if (!user) {
-      throw new AppError('Usuario no encontrado', HTTP_STATUS.NOT_FOUND);
+      throw new UserNotFoundError();
     }
     return user;
   }
 
   async create(data) {
-    this.assertNotAdmin(data.role);
+    this.assertValidRole(data.role);
 
     if (data.email && await this.repository.existsByEmail(data.email)) {
-      throw new AppError('Este email ya se encuentra registrado', HTTP_STATUS.CONFLICT);
+      throw new EmailAlreadyRegisteredError();
     }
 
     return this.repository.create({ ...data, role: data.role ?? USER_ROLES.USER });
   }
 
   async update(id, data) {
-    this.assertNotAdmin(data.role);
+    this.assertValidRole(data.role);
 
     if (data.email && await this.repository.existsByEmail(data.email, id)) {
-      throw new AppError('Este email ya se encuentra registrado', HTTP_STATUS.CONFLICT);
+      throw new EmailAlreadyRegisteredError();
     }
 
     const user = await this.repository.update(id, data);
     if (!user) {
-      throw new AppError('Usuario no encontrado', HTTP_STATUS.NOT_FOUND);
+      throw new UserNotFoundError();
     }
     return user;
   }
@@ -55,7 +65,7 @@ export class UsersService {
   async delete(id) {
     const user = await this.repository.delete(id);
     if (!user) {
-      throw new AppError('Usuario no encontrado', HTTP_STATUS.NOT_FOUND);
+      throw new UserNotFoundError();
     }
     return user;
   }
