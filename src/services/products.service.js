@@ -10,6 +10,7 @@ import {
   ShippingConfigError
 } from '../errors/customErrors.js';
 import { PRODUCT_STATUS, SHIPPING_RATES } from '../constants/index.js';
+import { logger } from '../config/logger.js';
 
 export class ProductsService {
   constructor(repository, notifier, appConfig) {
@@ -64,6 +65,7 @@ export class ProductsService {
       status: this.resolveStatus(stock)
     });
 
+    logger.info(`Producto creado: ${product._id}`, { code: product.code, status: product.status });
     await this.notifier.send('Producto creado: ' + product.title);
     return product;
   }

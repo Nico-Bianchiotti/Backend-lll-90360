@@ -4,13 +4,16 @@ import usersRouter from './routes/users.router.js';
 import productsRouter from './routes/products.router.js';
 import ordersRouter from './routes/orders.router.js';
 import mocksRouter from './routes/mocks.router.js';
+import loggerTestRouter from './routes/loggerTest.router.js';
 import { config } from './config/env.config.js';
 import { RouteNotFoundError } from './errors/customErrors.js';
 import { errorHandler } from './middlewares/errorHandler.js';
+import { httpLogger } from './middlewares/httpLogger.js';
 import { HTTP_STATUS } from './constants/index.js';
 
 const app = express();
 
+app.use(httpLogger);
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -22,6 +25,9 @@ app.get('/api/health', (req, res) => {
 app.use('/api/users', usersRouter);
 app.use('/api/products', productsRouter);
 app.use('/api/orders', ordersRouter);
+
+// Endpoint interno para verificar que el logger registra todos los niveles
+app.use('/api/loggerTest', loggerTestRouter);
 
 // Los mocks son una herramienta de desarrollo: no existen en producción
 if (!config.isProduction) {

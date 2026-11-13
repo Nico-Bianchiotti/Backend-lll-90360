@@ -10,6 +10,7 @@ import {
   OrderStatusLockedError
 } from '../errors/customErrors.js';
 import { USER_ROLES, ORDER_STATUS, ORDER_PRIORITY } from '../constants/index.js';
+import { logger } from '../config/logger.js';
 
 // Estados finales: un pedido entregado o cancelado ya no cambia.
 const FINAL_STATUSES = Object.freeze([ORDER_STATUS.DELIVERED, ORDER_STATUS.CANCELLED]);
@@ -72,7 +73,7 @@ export class OrdersService {
     }
 
     // El estado inicial y el total los define el negocio, no el cliente
-    return this.ordersRepository.create({
+    const order = await this.ordersRepository.create({
       user: userId,
       items,
       deliveryAddress,
@@ -80,6 +81,13 @@ export class OrdersService {
       status: ORDER_STATUS.CREATED,
       total: calculateOrderTotal(items)
     });
+
+    logger.info(`Pedido creado correctamente: ${order._id}`, {
+      userId: String(userId),
+      total: order.total,
+      priority: order.priority
+    });
+    return order;
   }
 
   async updateStatus(id, status) {
@@ -92,7 +100,9 @@ export class OrdersService {
       throw new OrderStatusLockedError(order.status);
     }
 
-    return this.ordersRepository.updateStatus(id, status);
+    const updated = await this.ordersRepository.updateStatus(id, status);
+    logger.info(`Pedido ${id} cambió de estado: ${order.status} → ${status}`);
+    return updated;
   }
 }
 

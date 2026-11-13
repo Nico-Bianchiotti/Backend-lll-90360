@@ -4,3 +4,6 @@ npm-debug.log*
 .env
 docs-clase
 postman
+# Logs generados por la aplicación (la carpeta queda en el repo gracias a .gitkeep)
+logs/*
+!logs/.gitkeep

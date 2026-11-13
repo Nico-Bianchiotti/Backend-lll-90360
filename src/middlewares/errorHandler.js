@@ -1,5 +1,6 @@
 import { AppError } from '../errors/customErrors.js';
 import { HTTP_STATUS } from '../constants/index.js';
+import { logger } from '../config/logger.js';
 
 const DATABASE_ERROR_NAMES = ['MongoServerSelectionError', 'MongooseServerSelectionError', 'MongoNetworkError', 'MongoNotConnectedError'];
 
@@ -38,11 +39,13 @@ export const errorHandler = (err, req, res, next) => {
   const route = `${req.method} ${req.originalUrl}`;
 
   if (error.statusCode >= HTTP_STATUS.INTERNAL_SERVER_ERROR) {
-    // Detalle completo solo en el log; al cliente le llega el mensaje del diccionario
-    console.error(`[ERROR] ${error.statusCode} ${error.code} en ${route}`);
-    console.error(error.cause ?? error);
+    // Error inesperado o del servidor: detalle completo (con stack) solo en el log;
+    // al cliente le llega el mensaje del diccionario
+    const original = error.cause ?? error;
+    logger.error(`${error.statusCode} ${error.code} en ${route}: ${original.message}`, { stack: original.stack });
   } else {
-    console.warn(`[WARN] ${error.statusCode} ${error.code} en ${route}: ${error.message}`);
+    // Error esperado o de negocio: queda como advertencia
+    logger.warning(`${error.statusCode} ${error.code} en ${route}: ${error.message}`);
   }
 
   res.status(error.statusCode).json({

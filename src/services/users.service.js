@@ -6,6 +6,7 @@ import {
   AdminRoleNotAllowedError
 } from '../errors/customErrors.js';
 import { USER_ROLES } from '../constants/index.js';
+import { logger } from '../config/logger.js';
 
 // Reglas de negocio de los usuarios. Recibe el repositorio por constructor.
 
@@ -45,7 +46,9 @@ export class UsersService {
       throw new EmailAlreadyRegisteredError();
     }
 
-    return this.repository.create({ ...data, role: data.role ?? USER_ROLES.USER });
+    const user = await this.repository.create({ ...data, role: data.role ?? USER_ROLES.USER });
+    logger.info(`Usuario creado: ${user._id}`, { role: user.role });
+    return user;
   }
 
   async update(id, data) {

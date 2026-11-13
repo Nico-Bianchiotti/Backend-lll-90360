@@ -6,6 +6,7 @@ import { generateOrder } from '../mocks/orders.mock.js';
 import { generateDelivery } from '../mocks/deliveries.mock.js';
 import { faker } from '../mocks/faker.js';
 import { calculateOrderTotal } from './orders.service.js';
+import { logger } from '../config/logger.js';
 import {
   InvalidMockQuantityError,
   NegativeMockQuantityError,
@@ -138,11 +139,13 @@ export class MocksService {
   getUsers(query) {
     const qty = this.parseQty(query.qty);
     const role = this.parseRole(query.role);
+    logger.info(`Mocks generados (sin guardar): ${qty} usuarios`, { role: role ?? 'mixto' });
     return this.buildUsers(qty, role).map(this.toPublicUser);
   }
 
   getCouriers(query) {
     const qty = this.parseQty(query.qty);
+    logger.info(`Mocks generados (sin guardar): ${qty} repartidores`);
     return this.buildUsers(qty, USER_ROLES.COURIER).map(this.toPublicUser);
   }
 
@@ -153,6 +156,7 @@ export class MocksService {
       couriers: Math.ceil(qty / 4),
       orders: qty
     });
+    logger.info(`Mocks generados (sin guardar): ${qty} pedidos`);
     return scenario.orders;
   }
 
@@ -163,11 +167,15 @@ export class MocksService {
       couriers: Math.ceil(qty / 4),
       orders: qty
     });
+    logger.info(`Mocks generados (sin guardar): ${qty} entregas`);
     return scenario.deliveries;
   }
 
   getScenario(query) {
-    const scenario = this.buildScenario(this.parseScenario(query));
+    const params = this.parseScenario(query);
+    this.warnIfNoCouriers(params);
+    const scenario = this.buildScenario(params);
+    logger.info('Mocks generados (sin guardar): escenario completo', params);
     return {
       users: scenario.clients.map(this.toPublicUser),
       couriers: scenario.couriers.map(this.toPublicUser),
@@ -176,19 +184,30 @@ export class MocksService {
     };
   }
 
+  // Un escenario sin repartidores es válido, pero conviene dejar constancia
+  warnIfNoCouriers({ couriers, orders }) {
+    if (couriers === 0 && orders > 0) {
+      logger.warning(`Escenario sin repartidores: los ${orders} pedidos quedarán solo en estado created o cancelled`);
+    }
+  }
+
   // ---------- Carga de datos de prueba (se guardan en MongoDB) ----------
 
   // Si la carga falla a mitad de camino, borra lo que se haya llegado a guardar.
   // Como los IDs se generan antes de insertar, se sabe exactamente qué borrar.
   async rollback({ userIds = [], orderIds = [] }) {
-    if (!this.usersRepository.isAvailable()) return false;
+    if (!this.usersRepository.isAvailable()) {
+      logger.error('No se pudo deshacer la carga parcial de mocks: no hay conexión con la base');
+      return false;
+    }
     try {
       await this.deliveriesRepository.deleteByOrders(orderIds);
       await this.ordersRepository.deleteByIds(orderIds);
       await this.usersRepository.deleteByIds(userIds);
+      logger.info('Carga de mocks deshecha: se borró lo que se había llegado a guardar');
       return true;
     } catch (error) {
-      console.error('[MOCKS] No se pudo deshacer la carga parcial:', error.message);
+      logger.error(`No se pudo deshacer la carga parcial de mocks: ${error.message}`, { stack: error.stack });
       return false;
     }
   }
@@ -208,6 +227,7 @@ export class MocksService {
 
     try {
       const inserted = await this.usersRepository.insertMany(users);
+      logger.info(`Seed de mocks: ${inserted.length} usuarios insertados en MongoDB`, { role: role ?? 'mixto' });
       return { inserted: inserted.length, collection: this.usersRepository.collectionName };
     } catch (cause) {
       const rolledBack = await this.rollback({ userIds: users.map((user) => user._id) });
@@ -216,7 +236,9 @@ export class MocksService {
   }
 
   async seedScenario(query) {
-    const scenario = this.buildScenario(this.parseScenario(query));
+    const params = this.parseScenario(query);
+    this.warnIfNoCouriers(params);
+    const scenario = this.buildScenario(params);
     this.assertDatabaseAvailable();
     const allUsers = [...scenario.clients, ...scenario.couriers];
 
@@ -234,6 +256,12 @@ export class MocksService {
       });
       throw new MockSeedFailedError({ rolledBack, cause });
     }
+
+    logger.info('Seed de mocks: escenario insertado en MongoDB', {
+      users: users.length,
+      orders: orders.length,
+      deliveries: deliveries.length
+    });
 
     return {
       inserted: {
@@ -256,6 +284,8 @@ export class MocksService {
     const deliveries = await this.deliveriesRepository.deleteByOrders(orderIds);
     const orders = await this.ordersRepository.deleteByIds(orderIds);
     const users = await this.usersRepository.deleteByIds(userIds);
+
+    logger.info('Datos de mocks eliminados de MongoDB', { users, orders, deliveries });
 
     return {
       deleted: {
