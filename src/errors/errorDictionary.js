@@ -34,6 +34,14 @@ export const ERRORS = Object.freeze({
   ORDER_OWNER_NOT_CLIENT: { statusCode: HTTP_STATUS.BAD_REQUEST, message: 'Solo los usuarios con rol cliente pueden tener pedidos' },
   ORDER_STATUS_LOCKED: { statusCode: HTTP_STATUS.CONFLICT, message: 'El pedido ya fue entregado o cancelado y no puede cambiar de estado' },
 
+  // Entregas
+  DELIVERY_NOT_FOUND: { statusCode: HTTP_STATUS.NOT_FOUND, message: 'La entrega solicitada no existe' },
+  DELIVERY_ALREADY_EXISTS: { statusCode: HTTP_STATUS.CONFLICT, message: 'El pedido ya tiene una entrega asociada' },
+  INVALID_DELIVERY_STATUS: { statusCode: HTTP_STATUS.BAD_REQUEST, message: 'El estado indicado no es válido para una entrega' },
+  USER_NOT_COURIER: { statusCode: HTTP_STATUS.BAD_REQUEST, message: 'El usuario indicado no es un repartidor' },
+  DELIVERY_COURIER_REQUIRED: { statusCode: HTTP_STATUS.CONFLICT, message: 'La entrega necesita un repartidor asignado para pasar a ese estado' },
+  DELIVERY_STATUS_LOCKED: { statusCode: HTTP_STATUS.CONFLICT, message: 'La entrega ya fue completada o cancelada y no puede modificarse' },
+
   // Mocks
   INVALID_MOCK_QUANTITY: { statusCode: HTTP_STATUS.BAD_REQUEST, message: 'La cantidad de datos a generar debe ser un número entero' },
   NEGATIVE_MOCK_QUANTITY: { statusCode: HTTP_STATUS.BAD_REQUEST, message: 'La cantidad de datos a generar no puede ser negativa' },

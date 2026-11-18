@@ -43,10 +43,11 @@ class MocksController {
     }
   }
 
-  // Carga de datos de prueba en MongoDB
+  // Carga de datos de prueba en MongoDB.
+  // Los parámetros pueden venir en el body (JSON) o por query; si están en ambos, gana el body.
   async seedUsers(req, res, next) {
     try {
-      const result = await mocksService.seedUsers(req.query);
+      const result = await mocksService.seedUsers({ ...req.query, ...req.body });
       res.status(HTTP_STATUS.CREATED).json({ status: 'success', payload: result });
     } catch (error) {
       next(error);
@@ -55,7 +56,7 @@ class MocksController {
 
   async seedScenario(req, res, next) {
     try {
-      const result = await mocksService.seedScenario(req.query);
+      const result = await mocksService.seedScenario({ ...req.query, ...req.body });
       res.status(HTTP_STATUS.CREATED).json({ status: 'success', payload: result });
     } catch (error) {
       next(error);

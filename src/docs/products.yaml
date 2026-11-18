@@ -1,0 +1,266 @@
+paths:
+  /api/products:
+    get:
+      tags: [Products]
+      summary: Listar productos
+      description: Por defecto devuelve solo los productos con stock. Con `all=true` incluye también los que no tienen.
+      parameters:
+        - name: all
+          in: query
+          required: false
+          description: Enviar `true` para incluir los productos sin stock.
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Lista de productos
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      payload:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Product'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Products]
+      summary: Crear producto
+      description: El estado (`available` u `out_of_stock`) lo calcula la API según el stock.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductInput'
+      responses:
+        '201':
+          description: Producto creado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      payload:
+                        $ref: '#/components/schemas/Product'
+        '400':
+          description: Datos inválidos. `VALIDATION_ERROR` (faltan title, code o price) o `INVALID_PRICE` (precio negativo o no numérico).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                faltanCampos:
+                  summary: Faltan campos obligatorios
+                  value:
+                    status: error
+                    statusCode: 400
+                    error: VALIDATION_ERROR
+                    message: 'Faltan campos obligatorios: title, code y price'
+                precioInvalido:
+                  summary: Precio negativo
+                  value:
+                    status: error
+                    statusCode: 400
+                    error: INVALID_PRICE
+                    message: El precio debe ser un número mayor o igual a 0
+        '409':
+          description: Ya existe un producto con ese código.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: error
+                statusCode: 409
+                error: PRODUCT_CODE_ALREADY_EXISTS
+                message: Ya existe un producto con el código CAJA-01
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/products/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [Products]
+      summary: Obtener un producto
+      responses:
+        '200':
+          description: Producto encontrado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      payload:
+                        $ref: '#/components/schemas/Product'
+        '404':
+          description: El producto no existe (o el ID tiene un formato inválido).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: error
+                statusCode: 404
+                error: PRODUCT_NOT_FOUND
+                message: El producto solicitado no existe
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      tags: [Products]
+      summary: Actualizar un producto
+      description: Modifica los campos enviados. Si cambia el stock, el estado se recalcula.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                code:
+                  type: string
+                price:
+                  type: number
+                  minimum: 0
+                stock:
+                  type: integer
+                  minimum: 0
+                  example: 0
+                category:
+                  type: string
+                status:
+                  type: string
+                  enum: [available, out_of_stock]
+      responses:
+        '200':
+          description: Producto actualizado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      payload:
+                        $ref: '#/components/schemas/Product'
+        '400':
+          description: Datos inválidos (`INVALID_PRODUCT_STATUS` o `VALIDATION_ERROR`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: error
+                statusCode: 400
+                error: INVALID_PRODUCT_STATUS
+                message: 'El estado "agotado" no es válido para un producto. Valores permitidos: available, out_of_stock'
+        '404':
+          description: El producto no existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: error
+                statusCode: 404
+                error: PRODUCT_NOT_FOUND
+                message: El producto solicitado no existe
+        '409':
+          description: El código ya pertenece a otro producto.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: error
+                statusCode: 409
+                error: PRODUCT_CODE_ALREADY_EXISTS
+                message: Ya existe un producto con el código CAJA-01
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [Products]
+      summary: Eliminar un producto
+      responses:
+        '200':
+          description: Producto eliminado. Devuelve el producto borrado.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                        example: Producto eliminado
+                      payload:
+                        $ref: '#/components/schemas/Product'
+        '404':
+          description: El producto no existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: error
+                statusCode: 404
+                error: PRODUCT_NOT_FOUND
+                message: El producto solicitado no existe
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/products/{id}/shipping-cost:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [Products]
+      summary: Cotizar el envío de un producto
+      description: En desarrollo la tarifa es plana (10). En producción es 50 más el 1% del precio del producto.
+      responses:
+        '200':
+          description: Cotización
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      payload:
+                        type: object
+                        properties:
+                          product:
+                            type: string
+                            example: 652f1c2b9b1e8a0012345679
+                          declaredValue:
+                            type: number
+                            example: 1500
+                          shippingCost:
+                            type: number
+                            example: 10
+        '404':
+          description: El producto no existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: error
+                statusCode: 404
+                error: PRODUCT_NOT_FOUND
+                message: El producto solicitado no existe
+        '500':
+          $ref: '#/components/responses/InternalError'

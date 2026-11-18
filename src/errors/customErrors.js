@@ -1,5 +1,5 @@
 import { ERRORS } from './errorDictionary.js';
-import { USER_ROLES, PRODUCT_STATUS, ORDER_STATUS, ORDER_PRIORITY, MOCKS } from '../constants/index.js';
+import { USER_ROLES, PRODUCT_STATUS, ORDER_STATUS, ORDER_PRIORITY, DELIVERY_STATUS, MOCKS } from '../constants/index.js';
 
 // Error base de la aplicación: toma el status y el mensaje del diccionario.
 // Se puede pasar un mensaje más específico sin cambiar el código.
@@ -122,6 +122,44 @@ export class OrderOwnerNotClientError extends AppError {
 export class OrderStatusLockedError extends AppError {
   constructor(status) {
     super('ORDER_STATUS_LOCKED', `El pedido está en estado "${status}" y ya no puede cambiar de estado`);
+  }
+}
+
+// ---------- Entregas ----------
+
+export class DeliveryNotFoundError extends AppError {
+  constructor() {
+    super('DELIVERY_NOT_FOUND');
+  }
+}
+
+export class DeliveryAlreadyExistsError extends AppError {
+  constructor() {
+    super('DELIVERY_ALREADY_EXISTS');
+  }
+}
+
+export class InvalidDeliveryStatusError extends AppError {
+  constructor(status) {
+    super('INVALID_DELIVERY_STATUS', `El estado "${status}" no es válido para una entrega. Valores permitidos: ${list(DELIVERY_STATUS)}`);
+  }
+}
+
+export class UserNotCourierError extends AppError {
+  constructor(role) {
+    super('USER_NOT_COURIER', `El usuario indicado tiene rol "${role}"; solo un usuario con rol "${USER_ROLES.COURIER}" puede hacer entregas`);
+  }
+}
+
+export class DeliveryCourierRequiredError extends AppError {
+  constructor(status) {
+    super('DELIVERY_COURIER_REQUIRED', `La entrega necesita un repartidor asignado para pasar al estado "${status}"`);
+  }
+}
+
+export class DeliveryStatusLockedError extends AppError {
+  constructor(status) {
+    super('DELIVERY_STATUS_LOCKED', `La entrega está en estado "${status}" y ya no puede modificarse`);
   }
 }
 

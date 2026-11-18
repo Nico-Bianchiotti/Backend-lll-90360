@@ -3,9 +3,11 @@ import cors from 'cors';
 import usersRouter from './routes/users.router.js';
 import productsRouter from './routes/products.router.js';
 import ordersRouter from './routes/orders.router.js';
+import deliveriesRouter from './routes/deliveries.router.js';
 import mocksRouter from './routes/mocks.router.js';
 import loggerTestRouter from './routes/loggerTest.router.js';
 import { config } from './config/env.config.js';
+import { setupSwagger } from './config/swagger.js';
 import { RouteNotFoundError } from './errors/customErrors.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { httpLogger } from './middlewares/httpLogger.js';
@@ -22,9 +24,13 @@ app.get('/api/health', (req, res) => {
   res.status(HTTP_STATUS.OK).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Documentación interactiva (Swagger UI) en /api/docs
+setupSwagger(app);
+
 app.use('/api/users', usersRouter);
 app.use('/api/products', productsRouter);
 app.use('/api/orders', ordersRouter);
+app.use('/api/deliveries', deliveriesRouter);
 
 // Endpoint interno para verificar que el logger registra todos los niveles
 app.use('/api/loggerTest', loggerTestRouter);

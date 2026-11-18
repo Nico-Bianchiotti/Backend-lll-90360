@@ -1,0 +1,41 @@
+paths:
+  /api/loggerTest:
+    get:
+      tags: [Logger]
+      summary: Probar el logger
+      description: |
+        **Herramienta de validación, no una funcionalidad de negocio.** Genera un log de cada nivel (`debug`, `http`, `info`, `warning`, `error`, `fatal`), marcados con `[PRUEBA]`, para comprobar que aparecen donde corresponde: la consola, `logs/combined-<fecha>.log` y, solo `error` y `fatal`, `logs/error-<fecha>.log`. Responde con la configuración activa del logger.
+      responses:
+        '200':
+          description: Logs generados
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      payload:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: Se registró un log de cada nivel. Revisá la consola y la carpeta logs/
+                          levels:
+                            type: array
+                            items:
+                              type: string
+                            example: [fatal, error, warning, info, http, debug]
+                          consoleLevel:
+                            type: string
+                            description: Nivel mínimo que se muestra según el entorno (`debug` en desarrollo, `info` en producción).
+                            example: debug
+                          files:
+                            type: object
+                            properties:
+                              errors:
+                                type: string
+                                example: logs/error-AAAA-MM-DD.log (solo error y fatal, se conservan 14 días)
+                              combined:
+                                type: string
+                                example: logs/combined-AAAA-MM-DD.log (nivel debug en adelante, se conservan 7 días)

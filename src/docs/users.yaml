@@ -1,0 +1,221 @@
+paths:
+  /api/users:
+    get:
+      tags: [Users]
+      summary: Listar usuarios
+      description: Devuelve todos los usuarios, del más nuevo al más viejo, sin la contraseña.
+      responses:
+        '200':
+          description: Lista de usuarios
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      payload:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/User'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    post:
+      tags: [Users]
+      summary: Crear usuario
+      description: Crea un cliente (`user`, por defecto) o un repartidor (`courier`). No se pueden crear administradores desde la API.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserInput'
+      responses:
+        '201':
+          description: Usuario creado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      payload:
+                        $ref: '#/components/schemas/User'
+        '400':
+          description: Datos inválidos. `VALIDATION_ERROR` (faltan campos obligatorios), `INVALID_ROLE` (rol inexistente) o `INVALID_JSON` (body mal formado).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                faltanCampos:
+                  summary: Faltan campos obligatorios
+                  value:
+                    status: error
+                    statusCode: 400
+                    error: VALIDATION_ERROR
+                    message: El apellido es obligatorio. El email es obligatorio. La contraseña es obligatoria
+                rolInvalido:
+                  summary: Rol inexistente
+                  value:
+                    status: error
+                    statusCode: 400
+                    error: INVALID_ROLE
+                    message: 'El rol "jefe" no es válido. Valores permitidos: admin, user, courier'
+        '403':
+          description: Se intentó crear un administrador.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: error
+                statusCode: 403
+                error: ADMIN_ROLE_NOT_ALLOWED
+                message: No es posible asignar el rol de administrador desde este endpoint
+        '409':
+          description: El email ya está registrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: error
+                statusCode: 409
+                error: EMAIL_ALREADY_REGISTERED
+                message: Este email ya se encuentra registrado
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/users/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [Users]
+      summary: Obtener un usuario
+      responses:
+        '200':
+          description: Usuario encontrado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      payload:
+                        $ref: '#/components/schemas/User'
+        '404':
+          description: El usuario no existe (o el ID tiene un formato inválido).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: error
+                statusCode: 404
+                error: USER_NOT_FOUND
+                message: El usuario solicitado no existe
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      tags: [Users]
+      summary: Actualizar un usuario
+      description: Modifica los campos enviados. No permite ascender a administrador.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          description: Usuario actualizado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      payload:
+                        $ref: '#/components/schemas/User'
+        '400':
+          description: Datos inválidos (`INVALID_ROLE`, `VALIDATION_ERROR` o `INVALID_JSON`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: error
+                statusCode: 400
+                error: INVALID_ROLE
+                message: 'El rol "jefe" no es válido. Valores permitidos: admin, user, courier'
+        '403':
+          description: Se intentó asignar el rol de administrador.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: error
+                statusCode: 403
+                error: ADMIN_ROLE_NOT_ALLOWED
+                message: No es posible asignar el rol de administrador desde este endpoint
+        '404':
+          description: El usuario no existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: error
+                statusCode: 404
+                error: USER_NOT_FOUND
+                message: El usuario solicitado no existe
+        '409':
+          description: El email ya pertenece a otro usuario.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: error
+                statusCode: 409
+                error: EMAIL_ALREADY_REGISTERED
+                message: Este email ya se encuentra registrado
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [Users]
+      summary: Eliminar un usuario
+      responses:
+        '200':
+          description: Usuario eliminado. Devuelve el usuario borrado.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                        example: Usuario eliminado
+                      payload:
+                        $ref: '#/components/schemas/User'
+        '404':
+          description: El usuario no existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: error
+                statusCode: 404
+                error: USER_NOT_FOUND
+                message: El usuario solicitado no existe
+        '500':
+          $ref: '#/components/responses/InternalError'

@@ -1,6 +1,6 @@
 # ShipNow API
 
-API de ShipNow con Node.js, Express y MongoDB, organizada en una arquitectura por capas (Controller → Service → Repository), con un módulo de mocking para generar y cargar datos de prueba, un manejo de errores centralizado y logging profesional con Winston.
+API de ShipNow con Node.js, Express y MongoDB, organizada en una arquitectura por capas (Controller → Service → Repository), con un módulo de mocking para generar y cargar datos de prueba, un manejo de errores centralizado, logging profesional con Winston y documentación interactiva con Swagger en **`/api/docs`**.
 
 ## Requisitos
 
@@ -48,6 +48,7 @@ src/
 ├── config/
 │   ├── env.config.js      # Único lugar que lee process.env; valida las variables al arrancar
 │   ├── logger.js          # Logger centralizado (Winston): niveles, formato, consola, archivos y rotación
+│   ├── swagger.js         # Configuración de Swagger/OpenAPI y montaje de /api/docs
 │   └── db.js              # Conexión a MongoDB
 ├── constants/
 │   └── index.js           # Roles, estados, prioridades, tarifas, parámetros de mocks y status HTTP (Object.freeze)
@@ -57,6 +58,7 @@ src/
 ├── services/              # Reglas de negocio
 ├── controllers/           # Entrada HTTP: lee req, llama al service, arma res
 ├── routes/                # Conectan cada path con su método del controller
+├── docs/                  # Documentación OpenAPI en YAML, un archivo por módulo + components.yaml (schemas)
 ├── errors/
 │   ├── errorDictionary.js # Diccionario: código → status HTTP y mensaje
 │   └── customErrors.js    # AppError y los errores del dominio (UserNotFoundError, etc.)
@@ -87,7 +89,13 @@ logs/                      # Archivos de log generados (ignorados en Git, salvo 
 | POST | `/api/orders` | Crear pedido (`user`, `items`, `deliveryAddress`, `priority` opcional) |
 | GET | `/api/orders/:id` | Obtener un pedido |
 | PATCH | `/api/orders/:id/status` | Cambiar el estado de un pedido (`{ "status": "assigned" }`) |
+| GET | `/api/deliveries` | Listar entregas (con los datos públicos del pedido y del repartidor) |
+| POST | `/api/deliveries` | Crear la entrega de un pedido (`order`, `courier` y `estimatedDate` opcionales) |
+| GET | `/api/deliveries/:id` | Obtener una entrega |
+| PATCH | `/api/deliveries/:id/status` | Cambiar el estado de una entrega (`{ "status": "in_transit" }`) |
+| PATCH | `/api/deliveries/:id/courier` | Asignar repartidor a una entrega (`{ "courier": "ID" }`) |
 | — | `/api/mocks/...` | Datos simulados y carga de datos de prueba (ver abajo) |
+| GET | `/api/docs` | Documentación interactiva (Swagger UI). El JSON de la especificación está en `/api/docs.json` |
 | GET | `/api/loggerTest` | Herramienta interna: genera un log de cada nivel (ver [Logging](#logging-y-monitoreo)) |
 
 Las respuestas exitosas tienen la forma `{ "status": "success", "payload": ... }`. Las de error se explican en [Manejo de errores](#manejo-de-errores).
@@ -145,6 +153,7 @@ Genera usuarios, repartidores, pedidos y entregas de prueba con [Faker](https://
 - `qty`: entero entre 1 y 100 (por defecto 5).
 - `role`: `admin`, `user` o `courier`.
 - `scenario`: por defecto `users=5`, `couriers=2`, `orders=10`. `couriers` y `orders` pueden ser 0.
+- En los dos `POST` de carga, los parámetros también pueden enviarse en el body como JSON (por ejemplo `{ "qty": 10 }` o `{ "users": 5, "couriers": 2, "orders": 10 }`). Si un valor está en el body y en la query, se usa el del body.
 - Un valor inválido, negativo o fuera de rango, o un rol inexistente, responde `400` con el formato de error estándar (ver [Manejo de errores](#manejo-de-errores)).
 
 ### Ejemplos
@@ -302,6 +311,12 @@ En los errores 500 el detalle técnico (stack, mensaje original) va **solo al lo
 | `INVALID_ORDER_PRIORITY` | 400 | Prioridad inexistente |
 | `ORDER_OWNER_NOT_CLIENT` | 400 | Se intenta crear un pedido para un repartidor o un admin |
 | `ORDER_STATUS_LOCKED` | 409 | Se intenta cambiar el estado de un pedido entregado o cancelado |
+| `DELIVERY_NOT_FOUND` | 404 | La entrega no existe |
+| `DELIVERY_ALREADY_EXISTS` | 409 | El pedido ya tiene una entrega |
+| `INVALID_DELIVERY_STATUS` | 400 | Estado de entrega inexistente |
+| `USER_NOT_COURIER` | 400 | Se intenta asignar como repartidor a un usuario que no tiene rol `courier` |
+| `DELIVERY_COURIER_REQUIRED` | 409 | Se intenta pasar a `assigned`, `in_transit` o `delivered` una entrega sin repartidor |
+| `DELIVERY_STATUS_LOCKED` | 409 | Se intenta modificar una entrega `delivered` o `cancelled` |
 | `INVALID_MOCK_QUANTITY` | 400 | La cantidad de mocks no es un número entero (`abc`, `2.5`) |
 | `NEGATIVE_MOCK_QUANTITY` | 400 | La cantidad de mocks es negativa |
 | `MOCK_QUANTITY_OUT_OF_RANGE` | 400 | La cantidad de mocks está fuera del rango (1 a 100; 0 a 100 para `couriers` y `orders` del escenario) |
@@ -484,4 +499,94 @@ Los archivos generados por la aplicación no se suben al repositorio. Solo se ve
 | Escenario de mocks sin repartidores | `warning` | `services/mocks.service.js` |
 | No se pudo deshacer una carga parcial de mocks | `error` | `services/mocks.service.js` |
 | Pedido creado / cambio de estado | `info` | `services/orders.service.js` |
+| Entrega creada / cambio de estado / repartidor asignado | `info` | `services/deliveries.service.js` |
+| Entrega creada sin repartidor | `warning` | `services/deliveries.service.js` |
 | Usuario o producto creado | `info` | `services/users.service.js`, `services/products.service.js` |
+
+## Documentación de la API (Swagger)
+
+La API está documentada con **OpenAPI 3** y se puede consultar y probar desde el navegador con **Swagger UI**.
+
+| Qué | Dónde |
+| --- | --- |
+| Documentación interactiva | `http://localhost:8080/api/docs` |
+| Especificación en JSON | `http://localhost:8080/api/docs.json` |
+
+### Cómo acceder
+
+1. Levantar el servidor: `npm install` y `npm run dev` (con el `.env` configurado, ver [Cómo correr el proyecto](#cómo-correr-el-proyecto)).
+2. Abrir `http://localhost:8080/api/docs` en el navegador (si cambiaste `PORT` en el `.env`, usá ese puerto).
+3. Elegir un endpoint, tocar **Try it out**, completar los datos y tocar **Execute**. La petición se hace contra tu servidor local y se ve la respuesta real.
+
+### Qué está documentado
+
+La documentación está agrupada por tags. Están documentados **todos** los endpoints de la API (30 operaciones):
+
+| Tag | Endpoints | Qué cubre |
+| --- | --- | --- |
+| **Users** | 5 | Alta, consulta, edición y baja de clientes y repartidores |
+| **Products** | 6 | CRUD de productos y cotización de envío |
+| **Orders** | 4 | Crear, listar, consultar y cambiar el estado de pedidos |
+| **Deliveries** | 5 | Crear la entrega de un pedido, listar, consultar, cambiar estado y asignar repartidor |
+| **Mocks** | 8 | Datos simulados (sin guardar), carga de datos de prueba en MongoDB y limpieza |
+| **Logger** | 1 | `GET /api/loggerTest`: herramienta de validación del logger, no es una funcionalidad de negocio |
+| **Health** | 1 | Estado del servidor |
+
+Cada endpoint indica método, ruta, descripción, parámetros, body esperado (con ejemplo), respuesta exitosa y los errores que puede devolver, con el código real del diccionario de errores (por ejemplo `ORDER_NOT_FOUND` o `NEGATIVE_MOCK_QUANTITY`).
+
+### Schemas reutilizables
+
+Están definidos en `src/docs/components.yaml` y se ven al final de Swagger UI, en la sección **Schemas**:
+
+- **Respuestas:** `SuccessResponse` y `ErrorResponse`.
+- **Entidades:** `User`, `Product`, `Order`, `OrderItem`, `Address`, `Delivery`.
+- **Bodies de entrada:** `UserInput`, `UserUpdate`, `ProductInput`, `OrderInput`, `OrderStatusInput`, `DeliveryInput`, `DeliveryStatusInput`, `DeliveryCourierInput`, `MockScenarioInput`.
+- **Mocks:** `MockUser`, `MockOrder`, `MockDelivery`.
+
+### Cómo está organizado
+
+- `src/config/swagger.js`: **solo configuración** (información general, servidor local, tags y montaje de Swagger UI). Usa `swagger-jsdoc` y `swagger-ui-express`.
+- `src/docs/*.yaml`: la documentación, un archivo por módulo (`users.yaml`, `products.yaml`, `orders.yaml`, `deliveries.yaml`, `mocks.yaml`, `logger.yaml`, `health.yaml`) más `components.yaml` con los schemas, parámetros y respuestas compartidas.
+- Los archivos de `routes/` no tienen nada de Swagger: siguen solo conectando cada path con su controller.
+
+### Aclaraciones para probar
+
+- **Sin autenticación:** ningún endpoint requiere token ni login.
+- **Orden sugerido para probar el flujo completo:**
+  1. `POST /api/users` para crear un cliente (rol `user`) y otro con `"role": "courier"`. Guardar los dos `_id`.
+  2. `POST /api/orders` con el `_id` del cliente en `user`.
+  3. `POST /api/deliveries` con el `_id` del pedido en `order`.
+  4. `PATCH /api/deliveries/{id}/courier` con el `_id` del repartidor.
+  5. `PATCH /api/deliveries/{id}/status` con `in_transit` y después `delivered`.
+- **Atajo:** `POST /api/mocks/seed/scenario` carga clientes, repartidores, pedidos y entregas ya relacionados, y `GET /api/users`, `/api/orders` y `/api/deliveries` devuelven sus IDs. Al terminar, `DELETE /api/mocks/seed` los borra.
+- **IDs:** un ID inexistente o con formato inválido en la ruta responde `404` (no `400`).
+- **Mocks:** los endpoints de `/api/mocks` solo existen con `NODE_ENV` distinto de `production`. En producción siguen apareciendo en la documentación, pero responden `404 ROUTE_NOT_FOUND`.
+- **Errores 500 y 503:** cualquier endpoint puede responder `500 INTERNAL_ERROR` ante una falla inesperada, o `503 DATABASE_UNAVAILABLE` si MongoDB no responde.
+
+### Evidencia: Swagger funcionando
+
+**Portada:** nombre, versión, descripción, propósito y servidor local.
+
+![Portada de Swagger](docs/screenshots/04-swagger-portada.png)
+
+**Try it out:** `GET /api/mocks/users` con su descripción y sus parámetros (`qty` y `role`), listo para ejecutar desde el navegador.
+
+![Try it out en GET /api/mocks/users](docs/screenshots/05-swagger-try-it-out.png)
+
+**Respuesta real del servidor:** `200` con tres usuarios simulados.
+
+![Respuesta 200 de GET /api/mocks/users](docs/screenshots/06-swagger-respuesta-200.png)
+
+**Respuestas documentadas:** el `200` y el `400`, con los cuatro códigos de error posibles y un ejemplo de cada uno.
+
+![Respuestas documentadas de GET /api/mocks/users](docs/screenshots/07-swagger-respuestas-documentadas.png)
+
+### Reglas de las entregas
+
+- Cada pedido puede tener **una sola** entrega.
+- Con repartidor, la entrega nace `assigned`; sin repartidor, `pending`.
+- El repartidor tiene que ser un usuario con rol `courier`.
+- Los estados `assigned`, `in_transit` y `delivered` requieren repartidor.
+- Al pasar a `delivered` se completa `deliveredAt`.
+- Una entrega `delivered` o `cancelled` ya no se puede modificar.
+- El código de seguimiento (`trackingCode`) lo genera la API.

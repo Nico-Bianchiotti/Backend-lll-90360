@@ -1,0 +1,19 @@
+paths:
+  /api/health:
+    get:
+      tags: [Health]
+      summary: Verificar que el servidor responde
+      responses:
+        '200':
+          description: El servidor está funcionando
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time

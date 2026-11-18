@@ -1,0 +1,545 @@
+# Schemas, parámetros y respuestas reutilizables por toda la documentación.
+components:
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      description: ID de MongoDB (ObjectId de 24 caracteres hexadecimales). Si no existe o tiene un formato inválido, la API responde 404.
+      schema:
+        type: string
+        example: 652f1c2b9b1e8a0012345678
+    MockQty:
+      name: qty
+      in: query
+      required: false
+      description: Cantidad de registros a generar. Entero entre 1 y 100.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 5
+
+  schemas:
+    # ---------- Respuestas ----------
+    SuccessResponse:
+      type: object
+      description: Forma de todas las respuestas exitosas. `payload` contiene el dato pedido. Los endpoints de eliminación agregan además un campo `message`, documentado en cada uno.
+      required: [status, payload]
+      properties:
+        status:
+          type: string
+          enum: [success]
+          example: success
+        payload:
+          description: El recurso o la lista de recursos (varía según el endpoint).
+    ErrorResponse:
+      type: object
+      description: Forma de todas las respuestas de error. Las arma el middleware global de errores.
+      required: [status, statusCode, error, message]
+      properties:
+        status:
+          type: string
+          enum: [error]
+          example: error
+        statusCode:
+          type: integer
+          description: El mismo código HTTP de la respuesta.
+          example: 404
+        error:
+          type: string
+          description: Código fijo del diccionario de errores, pensado para que lo lea el cliente.
+          example: USER_NOT_FOUND
+        message:
+          type: string
+          description: Explicación para personas.
+          example: El usuario solicitado no existe
+
+    # ---------- Usuarios ----------
+    User:
+      type: object
+      description: Usuario tal como lo devuelve la API. La contraseña nunca se incluye.
+      properties:
+        _id:
+          type: string
+          example: 652f1c2b9b1e8a0012345678
+        firstName:
+          type: string
+          example: Ana
+        lastName:
+          type: string
+          example: Pérez
+        email:
+          type: string
+          format: email
+          example: ana.perez@test.com
+        role:
+          type: string
+          enum: [admin, user, courier]
+          example: user
+        documents:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              reference:
+                type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    UserInput:
+      type: object
+      required: [firstName, lastName, email, password]
+      properties:
+        firstName:
+          type: string
+          example: Ana
+        lastName:
+          type: string
+          example: Pérez
+        email:
+          type: string
+          format: email
+          example: ana.perez@test.com
+        password:
+          type: string
+          example: clave1234
+        role:
+          type: string
+          enum: [user, courier]
+          default: user
+          description: El rol `admin` existe, pero no se puede asignar desde la API (responde 403).
+    UserUpdate:
+      type: object
+      description: Campos a modificar (todos opcionales).
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+          example: Gómez
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [user, courier]
+    UserSummary:
+      type: object
+      description: Datos públicos de un usuario cuando viene incluido dentro de otro recurso.
+      properties:
+        _id:
+          type: string
+          example: 652f1c2b9b1e8a0012345678
+        firstName:
+          type: string
+          example: Ana
+        lastName:
+          type: string
+          example: Pérez
+        email:
+          type: string
+          example: ana.perez@test.com
+        role:
+          type: string
+          enum: [admin, user, courier]
+
+    # ---------- Productos ----------
+    Product:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 652f1c2b9b1e8a0012345679
+        title:
+          type: string
+          example: Caja mediana
+        description:
+          type: string
+          example: Caja de cartón reforzado
+        code:
+          type: string
+          example: CAJA-01
+        price:
+          type: number
+          example: 1500
+        stock:
+          type: integer
+          example: 20
+        category:
+          type: string
+          example: general
+        status:
+          type: string
+          enum: [available, out_of_stock]
+          description: Lo calcula la API según el stock.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ProductInput:
+      type: object
+      required: [title, code, price]
+      properties:
+        title:
+          type: string
+          example: Caja mediana
+        description:
+          type: string
+          example: Caja de cartón reforzado
+        code:
+          type: string
+          example: CAJA-01
+        price:
+          type: number
+          minimum: 0
+          example: 1500
+        stock:
+          type: integer
+          minimum: 0
+          default: 0
+          example: 20
+        category:
+          type: string
+          default: general
+
+    # ---------- Pedidos ----------
+    OrderItem:
+      type: object
+      required: [description, quantity, unitPrice]
+      properties:
+        description:
+          type: string
+          example: Caja mediana
+        quantity:
+          type: integer
+          minimum: 1
+          example: 2
+        unitPrice:
+          type: number
+          minimum: 0
+          example: 1500
+    Address:
+      type: object
+      required: [street, city]
+      properties:
+        street:
+          type: string
+          example: Belgrano 120
+        city:
+          type: string
+          example: Córdoba
+        province:
+          type: string
+          example: Córdoba
+        zipCode:
+          type: string
+          example: "5000"
+    Order:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 652f1c2b9b1e8a001234567a
+        user:
+          description: Al crear o cambiar el estado se devuelve el ID del usuario; al listar o consultar un pedido, sus datos públicos.
+          oneOf:
+            - type: string
+              example: 652f1c2b9b1e8a0012345678
+            - $ref: '#/components/schemas/UserSummary'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        deliveryAddress:
+          $ref: '#/components/schemas/Address'
+        total:
+          type: number
+          description: Suma de cantidad × precio unitario. Lo calcula la API.
+          example: 3000
+        status:
+          type: string
+          enum: [created, assigned, picked_up, in_transit, delivered, cancelled]
+          example: created
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+          example: normal
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    OrderInput:
+      type: object
+      required: [user, items, deliveryAddress]
+      description: El estado inicial (`created`) y el `total` los define la API; si se envían, se ignoran.
+      properties:
+        user:
+          type: string
+          description: ID de un usuario con rol `user` (cliente).
+          example: 652f1c2b9b1e8a0012345678
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        deliveryAddress:
+          $ref: '#/components/schemas/Address'
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+          default: normal
+    OrderStatusInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [created, assigned, picked_up, in_transit, delivered, cancelled]
+          example: assigned
+
+    # ---------- Entregas ----------
+    OrderSummary:
+      type: object
+      description: Datos públicos de un pedido cuando viene incluido dentro de una entrega.
+      properties:
+        _id:
+          type: string
+          example: 652f1c2b9b1e8a001234567a
+        status:
+          type: string
+          enum: [created, assigned, picked_up, in_transit, delivered, cancelled]
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+        total:
+          type: number
+          example: 3000
+        deliveryAddress:
+          $ref: '#/components/schemas/Address'
+    Delivery:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 652f1c2b9b1e8a001234567b
+        order:
+          description: Al crear se devuelve el ID del pedido; en el resto de las operaciones, sus datos públicos.
+          oneOf:
+            - type: string
+              example: 652f1c2b9b1e8a001234567a
+            - $ref: '#/components/schemas/OrderSummary'
+        courier:
+          description: Repartidor asignado (`null` si todavía no tiene). Al crear se devuelve el ID; en el resto de las operaciones, sus datos públicos.
+          nullable: true
+          oneOf:
+            - type: string
+              example: 652f1c2b9b1e8a001234567c
+            - $ref: '#/components/schemas/UserSummary'
+        status:
+          type: string
+          enum: [pending, assigned, in_transit, delivered, cancelled]
+          example: pending
+        trackingCode:
+          type: string
+          description: Código de seguimiento generado por la API.
+          example: SN-3FA9C01B7E
+        estimatedDate:
+          type: string
+          format: date-time
+        deliveredAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Se completa cuando la entrega pasa a `delivered`.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    DeliveryInput:
+      type: object
+      required: [order]
+      description: El estado inicial y el código de seguimiento los define la API. Con repartidor la entrega nace `assigned`; sin repartidor, `pending`.
+      properties:
+        order:
+          type: string
+          description: ID de un pedido existente que todavía no tenga entrega.
+          example: 652f1c2b9b1e8a001234567a
+        courier:
+          type: string
+          description: (Opcional) ID de un usuario con rol `courier`.
+          example: 652f1c2b9b1e8a001234567c
+        estimatedDate:
+          type: string
+          format: date
+          description: (Opcional) Fecha estimada de entrega.
+          example: "2026-12-01"
+    DeliveryStatusInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [pending, assigned, in_transit, delivered, cancelled]
+          example: in_transit
+    DeliveryCourierInput:
+      type: object
+      required: [courier]
+      properties:
+        courier:
+          type: string
+          description: ID de un usuario con rol `courier`.
+          example: 652f1c2b9b1e8a001234567c
+
+    # ---------- Mocks ----------
+    MockUser:
+      type: object
+      description: Usuario simulado (no existe en la base). Sin contraseña.
+      properties:
+        _id:
+          type: string
+          example: 9c6c4dad4bdcdb3a71194d0d
+        firstName:
+          type: string
+          example: María Eugenia
+        lastName:
+          type: string
+          example: Espino Quintana
+        email:
+          type: string
+          example: mariaeugenia.espinoquintana.9cnq@shipnow-mock.test
+        role:
+          type: string
+          enum: [admin, user, courier]
+          example: user
+    MockOrder:
+      type: object
+      description: Pedido simulado. `user` es el ID de un cliente simulado.
+      properties:
+        _id:
+          type: string
+        user:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        deliveryAddress:
+          $ref: '#/components/schemas/Address'
+        status:
+          type: string
+          enum: [created, assigned, picked_up, in_transit, delivered, cancelled]
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+        total:
+          type: number
+    MockDelivery:
+      type: object
+      description: Entrega simulada. `order` y `courier` son IDs de registros simulados.
+      properties:
+        _id:
+          type: string
+        order:
+          type: string
+        courier:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [pending, assigned, in_transit, delivered, cancelled]
+        trackingCode:
+          type: string
+          example: SN-K2P9XQ71LM
+        estimatedDate:
+          type: string
+          format: date-time
+        deliveredAt:
+          type: string
+          format: date-time
+          nullable: true
+    MockScenarioInput:
+      type: object
+      description: Cantidades del escenario (todas opcionales). También pueden enviarse por query; si un valor está en ambos lados, se usa el del body.
+      properties:
+        users:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 5
+          description: Clientes a generar.
+        couriers:
+          type: integer
+          minimum: 0
+          maximum: 100
+          default: 2
+          description: Repartidores a generar.
+        orders:
+          type: integer
+          minimum: 0
+          maximum: 100
+          default: 10
+          description: Pedidos a generar (cada uno con su entrega).
+
+  responses:
+    InternalError:
+      description: Error inesperado del servidor. El detalle técnico queda solo en el log.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            status: error
+            statusCode: 500
+            error: INTERNAL_ERROR
+            message: Ocurrió un error inesperado
+    DatabaseUnavailable:
+      description: La base de datos no responde.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            status: error
+            statusCode: 503
+            error: DATABASE_UNAVAILABLE
+            message: La base de datos no está disponible en este momento. Intentá de nuevo más tarde
+    InvalidMockQuantity:
+      description: Cantidad inválida. Según el caso, el código es `NEGATIVE_MOCK_QUANTITY` (negativa), `INVALID_MOCK_QUANTITY` (no es un entero) o `MOCK_QUANTITY_OUT_OF_RANGE` (fuera del rango permitido).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            negativa:
+              summary: Cantidad negativa (qty=-5)
+              value:
+                status: error
+                statusCode: 400
+                error: NEGATIVE_MOCK_QUANTITY
+                message: 'El parámetro "qty" no puede ser negativo (valor recibido: -5)'
+            noEntera:
+              summary: No es un número entero (qty=abc o qty=2.5)
+              value:
+                status: error
+                statusCode: 400
+                error: INVALID_MOCK_QUANTITY
+                message: 'El parámetro "qty" debe ser un número entero (valor recibido: "abc")'
+            fueraDeRango:
+              summary: Fuera de rango (qty=0 o qty=500)
+              value:
+                status: error
+                statusCode: 400
+                error: MOCK_QUANTITY_OUT_OF_RANGE
+                message: 'El parámetro "qty" debe estar entre 1 y 100 (valor recibido: 500)'

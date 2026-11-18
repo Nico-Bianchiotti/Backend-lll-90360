@@ -1,0 +1,371 @@
+paths:
+  /api/mocks/users:
+    get:
+      tags: [Mocks]
+      summary: Obtener usuarios simulados
+      description: Genera usuarios con Faker y los devuelve **sin guardarlos**. Sin `role`, mezcla clientes (`user`) y repartidores (`courier`).
+      parameters:
+        - $ref: '#/components/parameters/MockQty'
+        - name: role
+          in: query
+          required: false
+          description: Rol de todos los usuarios generados.
+          schema:
+            type: string
+            enum: [admin, user, courier]
+      responses:
+        '200':
+          description: Usuarios simulados
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      payload:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/MockUser'
+        '400':
+          description: Cantidad inválida (`NEGATIVE_MOCK_QUANTITY`, `INVALID_MOCK_QUANTITY`, `MOCK_QUANTITY_OUT_OF_RANGE`) o rol inexistente (`INVALID_ROLE`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                negativa:
+                  summary: Cantidad negativa (qty=-5)
+                  value:
+                    status: error
+                    statusCode: 400
+                    error: NEGATIVE_MOCK_QUANTITY
+                    message: 'El parámetro "qty" no puede ser negativo (valor recibido: -5)'
+                noEntera:
+                  summary: No es un entero (qty=abc)
+                  value:
+                    status: error
+                    statusCode: 400
+                    error: INVALID_MOCK_QUANTITY
+                    message: 'El parámetro "qty" debe ser un número entero (valor recibido: "abc")'
+                fueraDeRango:
+                  summary: Fuera de rango (qty=500)
+                  value:
+                    status: error
+                    statusCode: 400
+                    error: MOCK_QUANTITY_OUT_OF_RANGE
+                    message: 'El parámetro "qty" debe estar entre 1 y 100 (valor recibido: 500)'
+                rolInvalido:
+                  summary: Rol inexistente (role=jefe)
+                  value:
+                    status: error
+                    statusCode: 400
+                    error: INVALID_ROLE
+                    message: 'El rol "jefe" no es válido. Valores permitidos: admin, user, courier'
+  /api/mocks/couriers:
+    get:
+      tags: [Mocks]
+      summary: Obtener repartidores simulados
+      description: Genera usuarios con rol `courier` y los devuelve sin guardarlos.
+      parameters:
+        - $ref: '#/components/parameters/MockQty'
+      responses:
+        '200':
+          description: Repartidores simulados
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      payload:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/MockUser'
+        '400':
+          $ref: '#/components/responses/InvalidMockQuantity'
+  /api/mocks/orders:
+    get:
+      tags: [Mocks]
+      summary: Obtener pedidos simulados
+      description: Genera pedidos con items, dirección, total, estado y prioridad válidos, y los devuelve sin guardarlos.
+      parameters:
+        - $ref: '#/components/parameters/MockQty'
+      responses:
+        '200':
+          description: Pedidos simulados
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      payload:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/MockOrder'
+        '400':
+          $ref: '#/components/responses/InvalidMockQuantity'
+  /api/mocks/deliveries:
+    get:
+      tags: [Mocks]
+      summary: Obtener entregas simuladas
+      description: Genera entregas, cada una asociada a un pedido simulado, y las devuelve sin guardarlas.
+      parameters:
+        - $ref: '#/components/parameters/MockQty'
+      responses:
+        '200':
+          description: Entregas simuladas
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      payload:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/MockDelivery'
+        '400':
+          $ref: '#/components/responses/InvalidMockQuantity'
+  /api/mocks/scenario:
+    get:
+      tags: [Mocks]
+      summary: Obtener un escenario simulado completo
+      description: |
+        Genera clientes, repartidores, pedidos y entregas **relacionados entre sí**, sin guardarlos:
+        cada pedido pertenece a un cliente y tiene exactamente una entrega, y la entrega lleva repartidor solo si el estado del pedido lo requiere.
+      parameters:
+        - name: users
+          in: query
+          description: Clientes a generar (1 a 100).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 5
+        - name: couriers
+          in: query
+          description: Repartidores a generar (0 a 100).
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 100
+            default: 2
+        - name: orders
+          in: query
+          description: Pedidos a generar, cada uno con su entrega (0 a 100).
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 100
+            default: 10
+      responses:
+        '200':
+          description: Escenario simulado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      payload:
+                        type: object
+                        properties:
+                          users:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/MockUser'
+                          couriers:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/MockUser'
+                          orders:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/MockOrder'
+                          deliveries:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/MockDelivery'
+        '400':
+          $ref: '#/components/responses/InvalidMockQuantity'
+  /api/mocks/seed:
+    post:
+      tags: [Mocks]
+      summary: Insertar usuarios de prueba en MongoDB
+      description: |
+        Genera usuarios y **los guarda en la base**. Los parámetros pueden enviarse en el body (JSON) o por query (`?qty=10&role=courier`); si un valor está en ambos lados, se usa el del body. Sin body ni query, inserta 5 usuarios.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                qty:
+                  type: integer
+                  minimum: 1
+                  maximum: 100
+                  default: 5
+                  description: Cantidad de usuarios a insertar.
+                role:
+                  type: string
+                  enum: [admin, user, courier]
+                  description: (Opcional) Rol de todos los usuarios. Sin este campo, mezcla clientes y repartidores.
+            example:
+              qty: 10
+      responses:
+        '201':
+          description: Usuarios insertados
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      payload:
+                        type: object
+                        properties:
+                          inserted:
+                            type: integer
+                            example: 10
+                          collection:
+                            type: string
+                            example: users
+        '400':
+          description: Cantidad inválida (`NEGATIVE_MOCK_QUANTITY`, `INVALID_MOCK_QUANTITY`, `MOCK_QUANTITY_OUT_OF_RANGE`) o rol inexistente (`INVALID_ROLE`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: error
+                statusCode: 400
+                error: NEGATIVE_MOCK_QUANTITY
+                message: 'El parámetro "qty" no puede ser negativo (valor recibido: -3)'
+        '500':
+          description: Falló la carga en MongoDB. Lo que se haya llegado a guardar se borra.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: error
+                statusCode: 500
+                error: MOCK_SEED_FAILED
+                message: No se pudieron cargar los datos de prueba en la base. No se guardó ningún registro.
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    delete:
+      tags: [Mocks]
+      summary: Borrar los datos de prueba
+      description: Borra **solo** los datos generados por los mocks (usuarios con email `@shipnow-mock.test`, sus pedidos y sus entregas). No toca los datos cargados a mano.
+      responses:
+        '200':
+          description: Cantidad de registros borrados por colección
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      payload:
+                        type: object
+                        properties:
+                          deleted:
+                            type: object
+                            properties:
+                              users:
+                                type: integer
+                                example: 7
+                              orders:
+                                type: integer
+                                example: 10
+                              deliveries:
+                                type: integer
+                                example: 10
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/mocks/seed/scenario:
+    post:
+      tags: [Mocks]
+      summary: Insertar un escenario de prueba completo en MongoDB
+      description: |
+        Genera clientes, repartidores, pedidos y entregas relacionados y **los guarda en la base**. Las cantidades pueden enviarse en el body (JSON) o por query; si un valor está en ambos lados, se usa el del body. Sin body ni query usa los valores por defecto (5 clientes, 2 repartidores, 10 pedidos).
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MockScenarioInput'
+            example:
+              users: 5
+              couriers: 2
+              orders: 10
+      responses:
+        '201':
+          description: Escenario insertado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      payload:
+                        type: object
+                        properties:
+                          inserted:
+                            type: object
+                            properties:
+                              users:
+                                type: integer
+                                example: 7
+                              orders:
+                                type: integer
+                                example: 10
+                              deliveries:
+                                type: integer
+                                example: 10
+                          detail:
+                            type: object
+                            properties:
+                              clients:
+                                type: integer
+                                example: 5
+                              couriers:
+                                type: integer
+                                example: 2
+        '400':
+          description: Alguna cantidad es inválida (`NEGATIVE_MOCK_QUANTITY`, `INVALID_MOCK_QUANTITY` o `MOCK_QUANTITY_OUT_OF_RANGE`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: error
+                statusCode: 400
+                error: NEGATIVE_MOCK_QUANTITY
+                message: 'El parámetro "couriers" no puede ser negativo (valor recibido: -1)'
+        '500':
+          description: Falló la carga en MongoDB. Lo que se haya llegado a guardar se borra.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: error
+                statusCode: 500
+                error: MOCK_SEED_FAILED
+                message: No se pudieron cargar los datos de prueba en la base. No se guardó ningún registro.
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
