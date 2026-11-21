@@ -1,7 +1,8 @@
 paths:
   /api/orders:
     get:
-      tags: [Orders]
+      tags:
+      - Orders
       summary: Listar pedidos
       description: Devuelve todos los pedidos, del más nuevo al más viejo, con los datos públicos del usuario.
       responses:
@@ -11,19 +12,20 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      payload:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/Order'
+                - $ref: '#/components/schemas/SuccessResponse'
+                - type: object
+                  properties:
+                    payload:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Order'
         '500':
           $ref: '#/components/responses/InternalError'
         '503':
           $ref: '#/components/responses/DatabaseUnavailable'
     post:
-      tags: [Orders]
+      tags:
+      - Orders
       summary: Crear pedido
       description: Crea un pedido para un cliente. El pedido nace en estado `created` y el `total` lo calcula la API.
       requestBody:
@@ -39,13 +41,13 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      payload:
-                        $ref: '#/components/schemas/Order'
+                - $ref: '#/components/schemas/SuccessResponse'
+                - type: object
+                  properties:
+                    payload:
+                      $ref: '#/components/schemas/Order'
         '400':
-          description: Datos inválidos. `VALIDATION_ERROR` (faltan datos o un item es incorrecto), `INVALID_ORDER_PRIORITY` (prioridad inexistente) u `ORDER_OWNER_NOT_CLIENT` (el usuario no es un cliente).
+          description: Datos inválidos. `VALIDATION_ERROR` (faltan datos o un item es incorrecto), `INVALID_ORDER_PRIORITY` (prioridad inexistente) u `ORDER_OWNER_NOT_CLIENT` (el usuario no es un cliente). También `INVALID_ID` si `user` no tiene formato de ID.
           content:
             application/json:
               schema:
@@ -79,6 +81,13 @@ paths:
                     statusCode: 400
                     error: ORDER_OWNER_NOT_CLIENT
                     message: Solo los usuarios con rol "user" pueden tener pedidos (el usuario indicado tiene rol "courier")
+                idInvalido_user:
+                  summary: ID con formato inválido (user)
+                  value:
+                    status: error
+                    statusCode: 400
+                    error: INVALID_ID
+                    message: El valor "abc" no es un ID válido para el campo "user" (se esperan 24 caracteres hexadecimales)
         '404':
           description: El usuario indicado no existe.
           content:
@@ -94,9 +103,10 @@ paths:
           $ref: '#/components/responses/InternalError'
   /api/orders/{id}:
     parameters:
-      - $ref: '#/components/parameters/IdParam'
+    - $ref: '#/components/parameters/IdParam'
     get:
-      tags: [Orders]
+      tags:
+      - Orders
       summary: Obtener un pedido
       responses:
         '200':
@@ -105,13 +115,15 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      payload:
-                        $ref: '#/components/schemas/Order'
+                - $ref: '#/components/schemas/SuccessResponse'
+                - type: object
+                  properties:
+                    payload:
+                      $ref: '#/components/schemas/Order'
+        '400':
+          $ref: '#/components/responses/InvalidId'
         '404':
-          description: El pedido no existe (o el ID tiene un formato inválido).
+          description: El pedido no existe.
           content:
             application/json:
               schema:
@@ -125,9 +137,10 @@ paths:
           $ref: '#/components/responses/InternalError'
   /api/orders/{id}/status:
     parameters:
-      - $ref: '#/components/parameters/IdParam'
+    - $ref: '#/components/parameters/IdParam'
     patch:
-      tags: [Orders]
+      tags:
+      - Orders
       summary: Cambiar el estado de un pedido
       description: Un pedido `delivered` o `cancelled` ya no puede cambiar de estado.
       requestBody:
@@ -143,22 +156,32 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      payload:
-                        $ref: '#/components/schemas/Order'
+                - $ref: '#/components/schemas/SuccessResponse'
+                - type: object
+                  properties:
+                    payload:
+                      $ref: '#/components/schemas/Order'
         '400':
-          description: Estado inválido.
+          description: Estado inválido. También `INVALID_ID` si `id` no tiene formato de ID.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-              example:
-                status: error
-                statusCode: 400
-                error: INVALID_ORDER_STATUS
-                message: 'El estado "on_the_way" no es válido para un pedido. Valores permitidos: created, assigned, picked_up, in_transit, delivered, cancelled'
+              examples:
+                principal:
+                  summary: INVALID_ORDER_STATUS
+                  value:
+                    status: error
+                    statusCode: 400
+                    error: INVALID_ORDER_STATUS
+                    message: 'El estado "on_the_way" no es válido para un pedido. Valores permitidos: created, assigned, picked_up, in_transit, delivered, cancelled'
+                idInvalido_id:
+                  summary: ID con formato inválido (id)
+                  value:
+                    status: error
+                    statusCode: 400
+                    error: INVALID_ID
+                    message: El valor "abc" no es un ID válido para el campo "id" (se esperan 24 caracteres hexadecimales)
         '404':
           description: El pedido no existe.
           content:

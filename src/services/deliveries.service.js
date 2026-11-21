@@ -13,6 +13,7 @@ import {
   DeliveryCourierRequiredError,
   DeliveryStatusLockedError
 } from '../errors/customErrors.js';
+import { assertValidId } from '../utils/validators.js';
 import { USER_ROLES, DELIVERY_STATUS } from '../constants/index.js';
 import { logger } from '../config/logger.js';
 
@@ -37,6 +38,7 @@ export class DeliveriesService {
 
   // Regla: solo un usuario existente con rol repartidor puede hacer entregas.
   async assertCourier(courierId) {
+    assertValidId(courierId, 'courier');
     const courier = await this.usersRepository.findById(courierId);
     if (!courier) {
       throw new UserNotFoundError('No se encontró el repartidor indicado');
@@ -68,6 +70,7 @@ export class DeliveriesService {
     if (!orderId) {
       throw new RequestValidationError('La entrega debe indicar el pedido (order)');
     }
+    assertValidId(orderId, 'order');
     if (estimatedDate !== undefined && Number.isNaN(new Date(estimatedDate).getTime())) {
       throw new RequestValidationError('estimatedDate debe ser una fecha válida (por ejemplo 2026-12-01)');
     }

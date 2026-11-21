@@ -9,6 +9,7 @@ import {
   OrderOwnerNotClientError,
   OrderStatusLockedError
 } from '../errors/customErrors.js';
+import { assertValidId } from '../utils/validators.js';
 import { USER_ROLES, ORDER_STATUS, ORDER_PRIORITY } from '../constants/index.js';
 import { logger } from '../config/logger.js';
 
@@ -58,6 +59,7 @@ export class OrdersService {
     if (!userId || !Array.isArray(items) || items.length === 0 || !deliveryAddress?.street || !deliveryAddress?.city) {
       throw new RequestValidationError('El pedido debe incluir user, items y dirección de entrega (street y city)');
     }
+    assertValidId(userId, 'user');
     this.validateItems(items);
 
     if (priority !== undefined && !Object.values(ORDER_PRIORITY).includes(priority)) {

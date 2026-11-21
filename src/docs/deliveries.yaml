@@ -1,7 +1,8 @@
 paths:
   /api/deliveries:
     get:
-      tags: [Deliveries]
+      tags:
+      - Deliveries
       summary: Listar entregas
       description: Devuelve todas las entregas, de la más nueva a la más vieja, con los datos públicos del pedido y del repartidor.
       responses:
@@ -11,19 +12,20 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      payload:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/Delivery'
+                - $ref: '#/components/schemas/SuccessResponse'
+                - type: object
+                  properties:
+                    payload:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Delivery'
         '500':
           $ref: '#/components/responses/InternalError'
         '503':
           $ref: '#/components/responses/DatabaseUnavailable'
     post:
-      tags: [Deliveries]
+      tags:
+      - Deliveries
       summary: Crear la entrega de un pedido
       description: Cada pedido puede tener una sola entrega. Si se indica repartidor, la entrega nace `assigned`; si no, `pending`. El código de seguimiento lo genera la API.
       requestBody:
@@ -39,13 +41,13 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      payload:
-                        $ref: '#/components/schemas/Delivery'
+                - $ref: '#/components/schemas/SuccessResponse'
+                - type: object
+                  properties:
+                    payload:
+                      $ref: '#/components/schemas/Delivery'
         '400':
-          description: Datos inválidos. `VALIDATION_ERROR` (falta el pedido o la fecha es inválida) o `USER_NOT_COURIER` (el usuario indicado no es repartidor).
+          description: Datos inválidos. `VALIDATION_ERROR` (falta el pedido o la fecha es inválida) o `USER_NOT_COURIER` (el usuario indicado no es repartidor). También `INVALID_ID` si `order` no tiene formato de ID.
           content:
             application/json:
               schema:
@@ -65,6 +67,13 @@ paths:
                     statusCode: 400
                     error: USER_NOT_COURIER
                     message: El usuario indicado tiene rol "user"; solo un usuario con rol "courier" puede hacer entregas
+                idInvalido_order:
+                  summary: ID con formato inválido (order)
+                  value:
+                    status: error
+                    statusCode: 400
+                    error: INVALID_ID
+                    message: El valor "abc" no es un ID válido para el campo "order" (se esperan 24 caracteres hexadecimales)
         '404':
           description: No existe el pedido (`ORDER_NOT_FOUND`) o el repartidor (`USER_NOT_FOUND`).
           content:
@@ -101,9 +110,10 @@ paths:
           $ref: '#/components/responses/InternalError'
   /api/deliveries/{id}:
     parameters:
-      - $ref: '#/components/parameters/IdParam'
+    - $ref: '#/components/parameters/IdParam'
     get:
-      tags: [Deliveries]
+      tags:
+      - Deliveries
       summary: Obtener una entrega
       responses:
         '200':
@@ -112,13 +122,15 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      payload:
-                        $ref: '#/components/schemas/Delivery'
+                - $ref: '#/components/schemas/SuccessResponse'
+                - type: object
+                  properties:
+                    payload:
+                      $ref: '#/components/schemas/Delivery'
+        '400':
+          $ref: '#/components/responses/InvalidId'
         '404':
-          description: La entrega no existe (o el ID tiene un formato inválido).
+          description: La entrega no existe.
           content:
             application/json:
               schema:
@@ -132,9 +144,10 @@ paths:
           $ref: '#/components/responses/InternalError'
   /api/deliveries/{id}/status:
     parameters:
-      - $ref: '#/components/parameters/IdParam'
+    - $ref: '#/components/parameters/IdParam'
     patch:
-      tags: [Deliveries]
+      tags:
+      - Deliveries
       summary: Cambiar el estado de una entrega
       description: |
         - Los estados `assigned`, `in_transit` y `delivered` requieren que la entrega tenga repartidor.
@@ -153,22 +166,32 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      payload:
-                        $ref: '#/components/schemas/Delivery'
+                - $ref: '#/components/schemas/SuccessResponse'
+                - type: object
+                  properties:
+                    payload:
+                      $ref: '#/components/schemas/Delivery'
         '400':
-          description: Estado inválido.
+          description: Estado inválido. También `INVALID_ID` si `id` no tiene formato de ID.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-              example:
-                status: error
-                statusCode: 400
-                error: INVALID_DELIVERY_STATUS
-                message: 'El estado "on_the_way" no es válido para una entrega. Valores permitidos: pending, assigned, in_transit, delivered, cancelled'
+              examples:
+                principal:
+                  summary: INVALID_DELIVERY_STATUS
+                  value:
+                    status: error
+                    statusCode: 400
+                    error: INVALID_DELIVERY_STATUS
+                    message: 'El estado "on_the_way" no es válido para una entrega. Valores permitidos: pending, assigned, in_transit, delivered, cancelled'
+                idInvalido_id:
+                  summary: ID con formato inválido (id)
+                  value:
+                    status: error
+                    statusCode: 400
+                    error: INVALID_ID
+                    message: El valor "abc" no es un ID válido para el campo "id" (se esperan 24 caracteres hexadecimales)
         '404':
           description: La entrega no existe.
           content:
@@ -205,9 +228,10 @@ paths:
           $ref: '#/components/responses/InternalError'
   /api/deliveries/{id}/courier:
     parameters:
-      - $ref: '#/components/parameters/IdParam'
+    - $ref: '#/components/parameters/IdParam'
     patch:
-      tags: [Deliveries]
+      tags:
+      - Deliveries
       summary: Asignar repartidor a una entrega
       description: Asigna (o cambia) el repartidor. Si la entrega estaba `pending`, pasa a `assigned`.
       requestBody:
@@ -223,22 +247,39 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      payload:
-                        $ref: '#/components/schemas/Delivery'
+                - $ref: '#/components/schemas/SuccessResponse'
+                - type: object
+                  properties:
+                    payload:
+                      $ref: '#/components/schemas/Delivery'
         '400':
-          description: Falta el repartidor (`VALIDATION_ERROR`) o el usuario no es repartidor (`USER_NOT_COURIER`).
+          description: Falta el repartidor (`VALIDATION_ERROR`) o el usuario no es repartidor (`USER_NOT_COURIER`). También `INVALID_ID` si `id` o `courier` no tiene formato de ID.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-              example:
-                status: error
-                statusCode: 400
-                error: USER_NOT_COURIER
-                message: El usuario indicado tiene rol "user"; solo un usuario con rol "courier" puede hacer entregas
+              examples:
+                principal:
+                  summary: USER_NOT_COURIER
+                  value:
+                    status: error
+                    statusCode: 400
+                    error: USER_NOT_COURIER
+                    message: El usuario indicado tiene rol "user"; solo un usuario con rol "courier" puede hacer entregas
+                idInvalido_id:
+                  summary: ID con formato inválido (id)
+                  value:
+                    status: error
+                    statusCode: 400
+                    error: INVALID_ID
+                    message: El valor "abc" no es un ID válido para el campo "id" (se esperan 24 caracteres hexadecimales)
+                idInvalido_courier:
+                  summary: ID con formato inválido (courier)
+                  value:
+                    status: error
+                    statusCode: 400
+                    error: INVALID_ID
+                    message: El valor "abc" no es un ID válido para el campo "courier" (se esperan 24 caracteres hexadecimales)
         '404':
           description: No existe la entrega (`DELIVERY_NOT_FOUND`) o el repartidor (`USER_NOT_FOUND`).
           content:

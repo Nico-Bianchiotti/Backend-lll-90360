@@ -5,7 +5,7 @@ components:
       name: id
       in: path
       required: true
-      description: ID de MongoDB (ObjectId de 24 caracteres hexadecimales). Si no existe o tiene un formato inválido, la API responde 404.
+      description: ID de MongoDB (ObjectId de 24 caracteres hexadecimales). Si el formato es inválido responde 400 `INVALID_ID`; si el formato es correcto pero no existe, 404.
       schema:
         type: string
         example: 652f1c2b9b1e8a0012345678
@@ -493,6 +493,17 @@ components:
           description: Pedidos a generar (cada uno con su entrega).
 
   responses:
+    InvalidId:
+      description: El ID de la ruta no tiene formato válido (se esperan 24 caracteres hexadecimales).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            status: error
+            statusCode: 400
+            error: INVALID_ID
+            message: 'El valor "abc" no es un ID válido para el campo "id" (se esperan 24 caracteres hexadecimales)'
     InternalError:
       description: Error inesperado del servidor. El detalle técnico queda solo en el log.
       content:

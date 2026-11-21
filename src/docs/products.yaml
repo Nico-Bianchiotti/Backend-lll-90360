@@ -1,17 +1,18 @@
 paths:
   /api/products:
     get:
-      tags: [Products]
+      tags:
+      - Products
       summary: Listar productos
       description: Por defecto devuelve solo los productos con stock. Con `all=true` incluye también los que no tienen.
       parameters:
-        - name: all
-          in: query
-          required: false
-          description: Enviar `true` para incluir los productos sin stock.
-          schema:
-            type: boolean
-            default: false
+      - name: all
+        in: query
+        required: false
+        description: Enviar `true` para incluir los productos sin stock.
+        schema:
+          type: boolean
+          default: false
       responses:
         '200':
           description: Lista de productos
@@ -19,17 +20,18 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      payload:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/Product'
+                - $ref: '#/components/schemas/SuccessResponse'
+                - type: object
+                  properties:
+                    payload:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Product'
         '500':
           $ref: '#/components/responses/InternalError'
     post:
-      tags: [Products]
+      tags:
+      - Products
       summary: Crear producto
       description: El estado (`available` u `out_of_stock`) lo calcula la API según el stock.
       requestBody:
@@ -45,11 +47,11 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      payload:
-                        $ref: '#/components/schemas/Product'
+                - $ref: '#/components/schemas/SuccessResponse'
+                - type: object
+                  properties:
+                    payload:
+                      $ref: '#/components/schemas/Product'
         '400':
           description: Datos inválidos. `VALIDATION_ERROR` (faltan title, code o price) o `INVALID_PRICE` (precio negativo o no numérico).
           content:
@@ -86,9 +88,10 @@ paths:
           $ref: '#/components/responses/InternalError'
   /api/products/{id}:
     parameters:
-      - $ref: '#/components/parameters/IdParam'
+    - $ref: '#/components/parameters/IdParam'
     get:
-      tags: [Products]
+      tags:
+      - Products
       summary: Obtener un producto
       responses:
         '200':
@@ -97,13 +100,15 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      payload:
-                        $ref: '#/components/schemas/Product'
+                - $ref: '#/components/schemas/SuccessResponse'
+                - type: object
+                  properties:
+                    payload:
+                      $ref: '#/components/schemas/Product'
+        '400':
+          $ref: '#/components/responses/InvalidId'
         '404':
-          description: El producto no existe (o el ID tiene un formato inválido).
+          description: El producto no existe.
           content:
             application/json:
               schema:
@@ -116,7 +121,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
     put:
-      tags: [Products]
+      tags:
+      - Products
       summary: Actualizar un producto
       description: Modifica los campos enviados. Si cambia el stock, el estado se recalcula.
       requestBody:
@@ -143,7 +149,9 @@ paths:
                   type: string
                 status:
                   type: string
-                  enum: [available, out_of_stock]
+                  enum:
+                  - available
+                  - out_of_stock
       responses:
         '200':
           description: Producto actualizado
@@ -151,22 +159,32 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      payload:
-                        $ref: '#/components/schemas/Product'
+                - $ref: '#/components/schemas/SuccessResponse'
+                - type: object
+                  properties:
+                    payload:
+                      $ref: '#/components/schemas/Product'
         '400':
-          description: Datos inválidos (`INVALID_PRODUCT_STATUS` o `VALIDATION_ERROR`).
+          description: Datos inválidos (`INVALID_PRODUCT_STATUS` o `VALIDATION_ERROR`). También `INVALID_ID` si `id` no tiene formato de ID.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-              example:
-                status: error
-                statusCode: 400
-                error: INVALID_PRODUCT_STATUS
-                message: 'El estado "agotado" no es válido para un producto. Valores permitidos: available, out_of_stock'
+              examples:
+                principal:
+                  summary: INVALID_PRODUCT_STATUS
+                  value:
+                    status: error
+                    statusCode: 400
+                    error: INVALID_PRODUCT_STATUS
+                    message: 'El estado "agotado" no es válido para un producto. Valores permitidos: available, out_of_stock'
+                idInvalido_id:
+                  summary: ID con formato inválido (id)
+                  value:
+                    status: error
+                    statusCode: 400
+                    error: INVALID_ID
+                    message: El valor "abc" no es un ID válido para el campo "id" (se esperan 24 caracteres hexadecimales)
         '404':
           description: El producto no existe.
           content:
@@ -192,7 +210,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
     delete:
-      tags: [Products]
+      tags:
+      - Products
       summary: Eliminar un producto
       responses:
         '200':
@@ -201,14 +220,16 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      message:
-                        type: string
-                        example: Producto eliminado
-                      payload:
-                        $ref: '#/components/schemas/Product'
+                - $ref: '#/components/schemas/SuccessResponse'
+                - type: object
+                  properties:
+                    message:
+                      type: string
+                      example: Producto eliminado
+                    payload:
+                      $ref: '#/components/schemas/Product'
+        '400':
+          $ref: '#/components/responses/InvalidId'
         '404':
           description: El producto no existe.
           content:
@@ -224,9 +245,10 @@ paths:
           $ref: '#/components/responses/InternalError'
   /api/products/{id}/shipping-cost:
     parameters:
-      - $ref: '#/components/parameters/IdParam'
+    - $ref: '#/components/parameters/IdParam'
     get:
-      tags: [Products]
+      tags:
+      - Products
       summary: Cotizar el envío de un producto
       description: En desarrollo la tarifa es plana (10). En producción es 50 más el 1% del precio del producto.
       responses:
@@ -236,21 +258,23 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      payload:
-                        type: object
-                        properties:
-                          product:
-                            type: string
-                            example: 652f1c2b9b1e8a0012345679
-                          declaredValue:
-                            type: number
-                            example: 1500
-                          shippingCost:
-                            type: number
-                            example: 10
+                - $ref: '#/components/schemas/SuccessResponse'
+                - type: object
+                  properties:
+                    payload:
+                      type: object
+                      properties:
+                        product:
+                          type: string
+                          example: 652f1c2b9b1e8a0012345679
+                        declaredValue:
+                          type: number
+                          example: 1500
+                        shippingCost:
+                          type: number
+                          example: 10
+        '400':
+          $ref: '#/components/responses/InvalidId'
         '404':
           description: El producto no existe.
           content:

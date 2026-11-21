@@ -23,6 +23,12 @@ export class RequestValidationError extends AppError {
   }
 }
 
+export class InvalidIdError extends AppError {
+  constructor(field, value) {
+    super('INVALID_ID', `El valor "${value}" no es un ID válido para el campo "${field}" (se esperan 24 caracteres hexadecimales)`);
+  }
+}
+
 export class DatabaseUnavailableError extends AppError {
   constructor() {
     super('DATABASE_UNAVAILABLE');

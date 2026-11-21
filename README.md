@@ -117,7 +117,7 @@ El criterio fue preguntarme, para cada línea, si cambiaría porque cambia **el 
 
 - Las consultas y sus filtros (`findAvailable` filtra en la base con `{ stock: { $gt: 0 }, status: 'available' }` en lugar de traer todo y filtrar en memoria).
 - Las proyecciones: el repositorio de usuarios nunca devuelve el campo `password`, y ninguno devuelve `__v`.
-- Validar que un ID tenga formato de ObjectId antes de consultar (si no lo tiene, se devuelve `null` y el Service responde 404, en lugar de un 500 por `CastError`).
+- Como resguardo, no consultar con un ID que no tenga formato de ObjectId (devuelve `null` en lugar de provocar un `CastError`). La validación principal del formato se hace antes, en la ruta (`router.param`) y en los services, y responde `400 INVALID_ID`.
 - Devolver objetos planos (`.lean()`) en lugar de documentos de Mongoose, para que las demás capas no dependan de Mongoose.
 
 Así, el Repository no es un "pasamanos" que solo hace `return Model.find()`, pero tampoco decide reglas: por ejemplo, ofrece `findAll()` y `findAvailable()`, y es el Service el que decide cuál usar.
@@ -292,7 +292,7 @@ En los errores 500 el detalle técnico (stack, mensaje original) va **solo al lo
 | --- | --- | --- |
 | `VALIDATION_ERROR` | 400 | Faltan datos obligatorios o tienen formato incorrecto |
 | `INVALID_JSON` | 400 | El body no es un JSON válido |
-| `INVALID_ID` | 400 | Un ID con formato inválido en un campo de referencia |
+| `INVALID_ID` | 400 | Un ID con formato inválido, en la ruta (`/api/orders/abc`) o en el body (`user`, `order`, `courier`) |
 | `ROUTE_NOT_FOUND` | 404 | La ruta no existe |
 | `DUPLICATE_KEY` | 409 | Un campo único ya existe en la base |
 | `DATABASE_UNAVAILABLE` | 503 | La base de datos no responde |
@@ -358,7 +358,8 @@ Para probar la falla de base: con el servidor corriendo, pausá el cluster en At
 | `POST /api/users` con `"role": "jefe"` | 400 `INVALID_ROLE` |
 | `POST /api/users` con `{ "firstName": "Ana" }` | 400 `VALIDATION_ERROR` |
 | `POST /api/users` con un body mal formado (`{mal json`) | 400 `INVALID_JSON` |
-| `GET /api/products/123` | 404 `PRODUCT_NOT_FOUND` |
+| `GET /api/products/652f1c2b9b1e8a0012345678` | 404 `PRODUCT_NOT_FOUND` |
+| `GET /api/products/123` (ID con formato inválido) | 400 `INVALID_ID` |
 | `POST /api/products` con `"price": -1` | 400 `INVALID_PRICE` |
 | `POST /api/products` con un `code` repetido | 409 `PRODUCT_CODE_ALREADY_EXISTS` |
 
@@ -367,6 +368,8 @@ Para probar la falla de base: con el servidor corriendo, pausá el cluster en At
 | Petición | Respuesta esperada |
 | --- | --- |
 | `POST /api/orders` con un `user` que no existe | 404 `USER_NOT_FOUND` |
+| `POST /api/orders` con `"user": "abc"` | 400 `INVALID_ID` |
+| `GET /api/orders/abc` | 400 `INVALID_ID` |
 | `POST /api/orders` sin `items` o sin dirección | 400 `VALIDATION_ERROR` |
 | `PATCH /api/orders/:id/status` con `{ "status": "on_the_way" }` | 400 `INVALID_ORDER_STATUS` |
 | `GET /api/orders/652f1c2b9b1e8a0012345678` | 404 `ORDER_NOT_FOUND` |
@@ -559,7 +562,7 @@ Están definidos en `src/docs/components.yaml` y se ven al final de Swagger UI, 
   4. `PATCH /api/deliveries/{id}/courier` con el `_id` del repartidor.
   5. `PATCH /api/deliveries/{id}/status` con `in_transit` y después `delivered`.
 - **Atajo:** `POST /api/mocks/seed/scenario` carga clientes, repartidores, pedidos y entregas ya relacionados, y `GET /api/users`, `/api/orders` y `/api/deliveries` devuelven sus IDs. Al terminar, `DELETE /api/mocks/seed` los borra.
-- **IDs:** un ID inexistente o con formato inválido en la ruta responde `404` (no `400`).
+- **IDs:** un ID con formato inválido (por ejemplo `abc`) responde `400 INVALID_ID`; un ID con formato correcto que no existe responde `404` (por ejemplo `USER_NOT_FOUND`). Para probar el 404, usá un ID válido inventado como `652f1c2b9b1e8a0012345678`.
 - **Mocks:** los endpoints de `/api/mocks` solo existen con `NODE_ENV` distinto de `production`. En producción siguen apareciendo en la documentación, pero responden `404 ROUTE_NOT_FOUND`.
 - **Errores 500 y 503:** cualquier endpoint puede responder `500 INTERNAL_ERROR` ante una falla inesperada, o `503 DATABASE_UNAVAILABLE` si MongoDB no responde.
 

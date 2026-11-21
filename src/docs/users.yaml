@@ -1,7 +1,8 @@
 paths:
   /api/users:
     get:
-      tags: [Users]
+      tags:
+      - Users
       summary: Listar usuarios
       description: Devuelve todos los usuarios, del más nuevo al más viejo, sin la contraseña.
       responses:
@@ -11,19 +12,20 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      payload:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/User'
+                - $ref: '#/components/schemas/SuccessResponse'
+                - type: object
+                  properties:
+                    payload:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/User'
         '500':
           $ref: '#/components/responses/InternalError'
         '503':
           $ref: '#/components/responses/DatabaseUnavailable'
     post:
-      tags: [Users]
+      tags:
+      - Users
       summary: Crear usuario
       description: Crea un cliente (`user`, por defecto) o un repartidor (`courier`). No se pueden crear administradores desde la API.
       requestBody:
@@ -39,11 +41,11 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      payload:
-                        $ref: '#/components/schemas/User'
+                - $ref: '#/components/schemas/SuccessResponse'
+                - type: object
+                  properties:
+                    payload:
+                      $ref: '#/components/schemas/User'
         '400':
           description: Datos inválidos. `VALIDATION_ERROR` (faltan campos obligatorios), `INVALID_ROLE` (rol inexistente) o `INVALID_JSON` (body mal formado).
           content:
@@ -91,9 +93,10 @@ paths:
           $ref: '#/components/responses/InternalError'
   /api/users/{id}:
     parameters:
-      - $ref: '#/components/parameters/IdParam'
+    - $ref: '#/components/parameters/IdParam'
     get:
-      tags: [Users]
+      tags:
+      - Users
       summary: Obtener un usuario
       responses:
         '200':
@@ -102,13 +105,15 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      payload:
-                        $ref: '#/components/schemas/User'
+                - $ref: '#/components/schemas/SuccessResponse'
+                - type: object
+                  properties:
+                    payload:
+                      $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/InvalidId'
         '404':
-          description: El usuario no existe (o el ID tiene un formato inválido).
+          description: El usuario no existe.
           content:
             application/json:
               schema:
@@ -121,7 +126,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
     put:
-      tags: [Users]
+      tags:
+      - Users
       summary: Actualizar un usuario
       description: Modifica los campos enviados. No permite ascender a administrador.
       requestBody:
@@ -137,22 +143,32 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      payload:
-                        $ref: '#/components/schemas/User'
+                - $ref: '#/components/schemas/SuccessResponse'
+                - type: object
+                  properties:
+                    payload:
+                      $ref: '#/components/schemas/User'
         '400':
-          description: Datos inválidos (`INVALID_ROLE`, `VALIDATION_ERROR` o `INVALID_JSON`).
+          description: Datos inválidos (`INVALID_ROLE`, `VALIDATION_ERROR` o `INVALID_JSON`). También `INVALID_ID` si `id` no tiene formato de ID.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-              example:
-                status: error
-                statusCode: 400
-                error: INVALID_ROLE
-                message: 'El rol "jefe" no es válido. Valores permitidos: admin, user, courier'
+              examples:
+                principal:
+                  summary: INVALID_ROLE
+                  value:
+                    status: error
+                    statusCode: 400
+                    error: INVALID_ROLE
+                    message: 'El rol "jefe" no es válido. Valores permitidos: admin, user, courier'
+                idInvalido_id:
+                  summary: ID con formato inválido (id)
+                  value:
+                    status: error
+                    statusCode: 400
+                    error: INVALID_ID
+                    message: El valor "abc" no es un ID válido para el campo "id" (se esperan 24 caracteres hexadecimales)
         '403':
           description: Se intentó asignar el rol de administrador.
           content:
@@ -189,7 +205,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
     delete:
-      tags: [Users]
+      tags:
+      - Users
       summary: Eliminar un usuario
       responses:
         '200':
@@ -198,14 +215,16 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties:
-                      message:
-                        type: string
-                        example: Usuario eliminado
-                      payload:
-                        $ref: '#/components/schemas/User'
+                - $ref: '#/components/schemas/SuccessResponse'
+                - type: object
+                  properties:
+                    message:
+                      type: string
+                      example: Usuario eliminado
+                    payload:
+                      $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/InvalidId'
         '404':
           description: El usuario no existe.
           content:
