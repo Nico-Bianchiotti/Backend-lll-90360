@@ -4,7 +4,7 @@ API de ShipNow con Node.js, Express y MongoDB, organizada en una arquitectura po
 
 ## Requisitos
 
-- Node.js 18 o superior
+- Node.js 20.19 o superior (los tests usan Mocha 12)
 - MongoDB (local o Atlas)
 
 ## Cómo correr el proyecto
@@ -33,6 +33,12 @@ API de ShipNow con Node.js, Express y MongoDB, organizada en una arquitectura po
    ```bash
    npm run dev   # desarrollo, con nodemon
    npm start     # producción
+   ```
+
+4. Correr los tests (ver [Testing](#testing)):
+
+   ```bash
+   npm test
    ```
 
 Si falta alguna variable obligatoria (por ejemplo `MONGODB_URI`), la app no arranca y muestra cuál falta:
@@ -70,6 +76,7 @@ src/
 ├── app.js                 # Arma la app de Express
 └── server.js              # Valida la config, conecta la base y levanta el servidor
 
+tests/                     # Suite de tests funcionales (Mocha + Chai + Supertest), un archivo por módulo
 logs/                      # Archivos de log generados (ignorados en Git, salvo .gitkeep)
 ```
 
@@ -593,3 +600,94 @@ Están definidos en `src/docs/components.yaml` y se ven al final de Swagger UI, 
 - Al pasar a `delivered` se completa `deliveredAt`.
 - Una entrega `delivered` o `cancelled` ya no se puede modificar.
 - El código de seguimiento (`trackingCode`) lo genera la API.
+
+## Testing
+
+La API tiene una suite de **18 tests funcionales automatizados** que prueban los endpoints principales de punta a punta: hacen peticiones HTTP reales a la app y verifican el status, la estructura del body y el formato de error. Cubren, como mínimo, un caso exitoso y uno de error por cada endpoint pedido.
+
+### Herramientas
+
+| Herramienta | Para qué se usa |
+| --- | --- |
+| [Mocha](https://mochajs.org/) | Organiza y ejecuta los tests (`describe`, `it`, hooks `before`/`beforeEach`/`after`) |
+| [Chai](https://www.chaijs.com/) | Valida los resultados (`expect(...).to.equal(...)`) |
+| [Supertest](https://github.com/ladjs/supertest) | Hace las peticiones HTTP a la app de Express sin levantar el servidor |
+| [mongodb-memory-server](https://github.com/typegoose/mongodb-memory-server) | Levanta un MongoDB en memoria, aislado y descartable, para cada corrida |
+| [cross-env](https://github.com/kentcdodds/cross-env) | Define `NODE_ENV=test` en el script, igual en Windows, Linux y Mac |
+
+### Cómo ejecutar los tests
+
+```bash
+npm install
+npm test
+```
+
+No hace falta levantar el servidor, tener un `.env` ni una base de datos: `npm test` arma todo lo necesario. La primera vez, `npm install` descarga el binario de MongoDB que usa la base en memoria (unos 100 MB), por eso puede tardar un poco más.
+
+### Base de datos de testing
+
+**No se necesita una base de datos externa.** Al empezar, los tests levantan un MongoDB **en memoria** con la base `shipnow_test`. Está totalmente separada de la de desarrollo, empieza vacía en cada corrida y desaparece al terminar. Nunca se tocan datos reales.
+
+Si preferís usar una base propia (por ejemplo, una base de testing en Atlas), definí `MONGODB_URI` como variable del sistema antes de correr los tests:
+
+```powershell
+# PowerShell
+$env:MONGODB_URI="mongodb+srv://usuario:clave@cluster.mongodb.net/shipnow_test"; npm test
+```
+
+Por seguridad, los tests **se niegan a correr** si el nombre de la base no contiene `test`, porque borran los datos que generan.
+
+### Variables de entorno
+
+El entorno de testing tiene sus propias variables, en el archivo **`.env.test`**. Se carga solo cuando `NODE_ENV=test`, es decir, con `npm test`. Se sube al repositorio porque no tiene secretos:
+
+| Variable | Valor en testing | Comentario |
+| --- | --- | --- |
+| `NODE_ENV` | `test` | La define el script `npm test` |
+| `PORT` | `8081` | Solo se usa en la información de Swagger; los tests no abren ningún puerto |
+| `SHIPPING_API_KEY` | `test_shipping_key` | Valor de prueba |
+| `MONGODB_URI` | *(no se define)* | La genera la base en memoria. Opcionalmente, se puede definir como variable del sistema |
+
+En el entorno de testing:
+- La consola del logger queda en silencio, para no mezclar los logs con el reporte de Mocha. Los archivos de `logs/` siguen registrando.
+- Los endpoints de mocks están disponibles, igual que en desarrollo.
+
+### Cómo está organizado
+
+```
+.mocharc.json             # Configuración de Mocha: qué archivos correr, setup global y timeout
+.env.test                 # Variables del entorno de testing
+tests/
+├── setup.js              # Base en memoria + hooks globales: conectar, verificar que la base es de testing, desconectar
+├── helpers/
+│   ├── api.js            # Cliente de Supertest y validaciones comunes (formato de éxito y de error)
+│   ├── db.js             # Limpieza de la base de testing
+│   └── fixtures.js       # Datos de prueba controlados (clientes, repartidores y pedidos)
+├── users.test.js
+├── orders.test.js
+├── mocks.test.js
+├── logger.test.js
+├── docs.test.js
+└── errors.test.js
+```
+
+La app de Express (`src/app.js`) está separada del levantamiento del servidor (`src/server.js`): los tests importan `app` y Supertest la usa directamente, sin abrir un puerto.
+
+### Datos de prueba y limpieza
+
+- **Datos controlados y repetibles:** cada test crea lo que necesita dentro de la base de testing. Por ejemplo, antes de probar un pedido se crea un cliente válido. Los datos se arman con los generadores del módulo de mocks, así tienen la misma forma que los reales. Nunca se usan datos cargados a mano.
+- **Limpieza:** cada archivo vacía todas las colecciones en un hook `beforeEach`, así cada test arranca con la base vacía y no depende del resultado de otros tests ni del orden en que se ejecutan. Al terminar la suite, `afterAll` vuelve a limpiar y desconecta.
+- La suite pasa **dos veces seguidas** sin borrar nada a mano, y cada archivo también pasa si se lo corre solo.
+
+### Qué módulos están cubiertos
+
+| Archivo | Tests | Casos exitosos | Casos de error |
+| --- | --- | --- | --- |
+| `users.test.js` | 2 | `GET /api/users` lista los usuarios sin exponer la contraseña | Usuario inexistente → 404 `USER_NOT_FOUND` |
+| `orders.test.js` | 7 | Listar pedidos; crear un pedido válido (estado `created` y total calculado); consultar por ID; actualizar el estado | Datos incompletos → 400 `VALIDATION_ERROR`; pedido inexistente → 404 `ORDER_NOT_FOUND`; estado inválido (`on_the_way`) → 400 `INVALID_ORDER_STATUS` |
+| `mocks.test.js` | 5 | Usuarios y pedidos simulados (forma, roles, estados, prioridades y total válidos, sin guardarse); carga de usuarios de prueba en MongoDB | Cantidad negativa → 400 `NEGATIVE_MOCK_QUANTITY`; cantidad no numérica → 400 `INVALID_MOCK_QUANTITY` |
+| `logger.test.js` | 1 | `GET /api/loggerTest` responde los seis niveles y la configuración del entorno | — |
+| `docs.test.js` | 2 | Swagger UI abre en `/api/docs`; `/api/docs.json` tiene la información general, los tags y los schemas | — |
+| `errors.test.js` | 1 | — | Ruta inexistente → 404 `ROUTE_NOT_FOUND` |
+
+Cada test valida el **status HTTP** y la **estructura del body**: las respuestas exitosas tienen `{ status: "success", payload }` con las propiedades esperadas, y los errores tienen exactamente `{ status: "error", statusCode, error, message }` con el código del diccionario de errores (el mismo que documenta Swagger para cada caso).

@@ -39,3 +39,5 @@ paths:
                               combined:
                                 type: string
                                 example: logs/combined-AAAA-MM-DD.log (nivel debug en adelante, se conservan 7 días)
+        '500':
+          $ref: '#/components/responses/InternalError'

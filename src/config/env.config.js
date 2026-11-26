@@ -1,6 +1,9 @@
 import dotenv from 'dotenv';
 
-dotenv.config({ quiet: true });
+// Cada entorno tiene su archivo: en testing se usa .env.test (separado del de desarrollo).
+// dotenv no pisa variables que ya existan en el sistema.
+const ENV_FILE = process.env.NODE_ENV === 'test' ? '.env.test' : '.env';
+dotenv.config({ path: ENV_FILE, quiet: true });
 
 
 const REQUIRED_VARS = ['PORT', 'MONGODB_URI', 'NODE_ENV', 'SHIPPING_API_KEY'];

@@ -87,6 +87,9 @@ export const configureLogger = (config) => {
   const level = LEVEL_BY_ENVIRONMENT[config.nodeEnv] ?? LEVEL_BY_ENVIRONMENT.production;
   consoleTransport.level = level;
   combinedFileTransport.level = level;
+  // En testing la consola queda en silencio para no mezclar logs con el reporte de Mocha
+  // (los archivos de logs/ siguen registrando).
+  consoleTransport.silent = config.nodeEnv === 'test';
   logger.debug(`Logger configurado para el entorno "${config.nodeEnv}" (nivel mínimo: ${level})`);
 };
 
