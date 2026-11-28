@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { api, expectError, expectSuccess, expectPublicUser } from './helpers/api.js';
 import { clearDatabase } from './helpers/db.js';
-import { createClient, createOrder, validOrderBody, NON_EXISTENT_ID } from './helpers/fixtures.js';
+import { createClient, createOrder, validOrderBody, NON_EXISTENT_ID, INVALID_ID } from './helpers/fixtures.js';
 import { ORDER_STATUS, ORDER_PRIORITY } from '../src/constants/index.js';
 
 describe('Orders - /api/orders', () => {
@@ -58,6 +58,16 @@ describe('Orders - /api/orders', () => {
     it('GET /api/orders/:id responde 404 ORDER_NOT_FOUND si el pedido no existe', async () => {
       expectError(await api.get(`/api/orders/${NON_EXISTENT_ID}`), 404, 'ORDER_NOT_FOUND');
     });
+
+    it('GET /api/orders/:id responde 400 INVALID_ID si el ID tiene un formato inválido', async () => {
+      expectError(await api.get(`/api/orders/${INVALID_ID}`), 400, 'INVALID_ID');
+    });
+
+    it('POST /api/orders responde 400 INVALID_ID si el usuario tiene un formato inválido', async () => {
+      const res = await api.post('/api/orders').send(validOrderBody(INVALID_ID));
+      expectError(res, 400, 'INVALID_ID');
+      expect(res.body.message).to.include('"user"');
+    });
   });
 
   describe('Actualizar estados', () => {
@@ -70,6 +80,11 @@ describe('Orders - /api/orders', () => {
       );
       expect(order._id).to.equal(created._id);
       expect(order.status).to.equal(ORDER_STATUS.ASSIGNED);
+    });
+
+    it('PATCH /api/orders/:id/status responde 400 INVALID_ID si el ID tiene un formato inválido', async () => {
+      const res = await api.patch(`/api/orders/${INVALID_ID}/status`).send({ status: ORDER_STATUS.ASSIGNED });
+      expectError(res, 400, 'INVALID_ID');
     });
 
     it('PATCH /api/orders/:id/status responde 400 INVALID_ORDER_STATUS si el estado no existe', async () => {

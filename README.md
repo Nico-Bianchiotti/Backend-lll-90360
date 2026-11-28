@@ -603,7 +603,7 @@ Están definidos en `src/docs/components.yaml` y se ven al final de Swagger UI, 
 
 ## Testing
 
-La API tiene una suite de **18 tests funcionales automatizados** que prueban los endpoints principales de punta a punta: hacen peticiones HTTP reales a la app y verifican el status, la estructura del body y el formato de error. Cubren, como mínimo, un caso exitoso y uno de error por cada endpoint pedido.
+La API tiene una suite de **62 tests funcionales automatizados** que prueban los endpoints de punta a punta: hacen peticiones HTTP reales a la app y verifican el status, la estructura del body y el formato de error. Cubren un caso exitoso y al menos uno de error por cada endpoint, y todos los módulos documentados en Swagger (usuarios, pedidos, entregas, productos, mocks y logger), incluido el `400 INVALID_ID` ante IDs con formato inválido.
 
 ### Herramientas
 
@@ -662,9 +662,11 @@ tests/
 ├── helpers/
 │   ├── api.js            # Cliente de Supertest y validaciones comunes (formato de éxito y de error)
 │   ├── db.js             # Limpieza de la base de testing
-│   └── fixtures.js       # Datos de prueba controlados (clientes, repartidores y pedidos)
+│   └── fixtures.js       # Datos de prueba controlados (clientes, repartidores, pedidos, entregas y productos)
 ├── users.test.js
 ├── orders.test.js
+├── deliveries.test.js
+├── products.test.js
 ├── mocks.test.js
 ├── logger.test.js
 ├── docs.test.js
@@ -683,11 +685,13 @@ La app de Express (`src/app.js`) está separada del levantamiento del servidor (
 
 | Archivo | Tests | Casos exitosos | Casos de error |
 | --- | --- | --- | --- |
-| `users.test.js` | 2 | `GET /api/users` lista los usuarios sin exponer la contraseña | Usuario inexistente → 404 `USER_NOT_FOUND` |
-| `orders.test.js` | 7 | Listar pedidos; crear un pedido válido (estado `created` y total calculado); consultar por ID; actualizar el estado | Datos incompletos → 400 `VALIDATION_ERROR`; pedido inexistente → 404 `ORDER_NOT_FOUND`; estado inválido (`on_the_way`) → 400 `INVALID_ORDER_STATUS` |
+| `users.test.js` | 3 | `GET /api/users` lista los usuarios sin exponer la contraseña | Usuario inexistente → 404 `USER_NOT_FOUND`; ID con formato inválido → 400 `INVALID_ID` |
+| `orders.test.js` | 10 | Listar pedidos; crear un pedido válido (estado `created` y total calculado); consultar por ID; actualizar el estado | Datos incompletos → 400 `VALIDATION_ERROR`; pedido inexistente → 404 `ORDER_NOT_FOUND`; estado inválido (`on_the_way`) → 400 `INVALID_ORDER_STATUS`; ID inválido en la ruta y en el `user` del body → 400 `INVALID_ID` |
+| `deliveries.test.js` | 26 | Crear una entrega `pending` o `assigned` con código de seguimiento; listar y consultar con el pedido y el repartidor; llevarla hasta `delivered` (con `deliveredAt`); cancelarla; asignar repartidor | Entrega duplicada (409); datos incompletos o fecha inválida (400); pedido o repartidor inexistentes (404); usuario que no es repartidor (400 `USER_NOT_COURIER`); estado inválido (400 `INVALID_DELIVERY_STATUS`); repartidor requerido (409); entrega finalizada (409); ID inválido (400 `INVALID_ID`) |
+| `products.test.js` | 14 | Listado con y sin stock; alta con estado calculado según el stock; consulta; edición; baja; cotización de envío | Datos incompletos (400); precio inválido (400 `INVALID_PRICE`); código repetido (409); estado inválido (400); producto inexistente (404); ID inválido (400 `INVALID_ID`) |
 | `mocks.test.js` | 5 | Usuarios y pedidos simulados (forma, roles, estados, prioridades y total válidos, sin guardarse); carga de usuarios de prueba en MongoDB | Cantidad negativa → 400 `NEGATIVE_MOCK_QUANTITY`; cantidad no numérica → 400 `INVALID_MOCK_QUANTITY` |
 | `logger.test.js` | 1 | `GET /api/loggerTest` responde los seis niveles y la configuración del entorno | — |
 | `docs.test.js` | 2 | Swagger UI abre en `/api/docs`; `/api/docs.json` tiene la información general, los tags y los schemas | — |
 | `errors.test.js` | 1 | — | Ruta inexistente → 404 `ROUTE_NOT_FOUND` |
 
-Cada test valida el **status HTTP** y la **estructura del body**: las respuestas exitosas tienen `{ status: "success", payload }` con las propiedades esperadas, y los errores tienen exactamente `{ status: "error", statusCode, error, message }` con el código del diccionario de errores (el mismo que documenta Swagger para cada caso).
+Cada test valida el **status HTTP** y la **estructura del body**: las respuestas exitosas tienen `{ status: "success", payload }` con las propiedades esperadas, y los errores tienen exactamente `{ status: "error", statusCode, error, message }` con el código del diccionario de errores. Son los mismos códigos que documenta Swagger para cada caso, así que cada comportamiento documentado de estos módulos tiene su test.
